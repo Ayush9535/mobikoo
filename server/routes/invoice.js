@@ -20,6 +20,10 @@ router.use(async (req, res, next) => {
   }
 });
 
+
+// Bulk upload
+router.post('/bulk', invoiceController.bulkUploadInvoices); // manager only
+
 // CRUD routes
 router.post('/', invoiceController.createInvoice); // manager only
 router.get('/', invoiceController.getAllInvoices); // all roles

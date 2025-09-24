@@ -24,16 +24,57 @@ async function createInvoice(data) {
   return result.insertId;
 }
 
-// Get all invoices (for admin, shopowner, manager)
-async function getAllInvoices() {
-  const [rows] = await pool.query('SELECT * FROM invoices ORDER BY id DESC');
-  return rows;
+// Get all invoices (for admin, shopowner, manager) with user email and shop name
+async function getAllInvoices(userId) {
+  let query = `
+    SELECT i.*, 
+      u.email AS created_by_email,
+      s.shop_name AS shop_name,
+      s.shop_code AS shop_code_full
+    FROM invoices i
+    LEFT JOIN users u ON i.created_by = u.id
+    LEFT JOIN shop_owners s ON i.shop_code = s.shop_code
+  `;
+  const params = [];
+  if (userId) {
+    query += ' WHERE i.created_by = ?';
+    params.push(userId);
+  }
+  query += ' ORDER BY i.id DESC';
+  const [rows] = await pool.query(query, params);
+  // Map to replace created_by and shop_code fields for frontend
+  return rows.map(row => ({
+    ...row,
+    created_by: row.created_by_email || row.created_by,
+    shop_code: row.shop_code_full || row.shop_code,
+    shop_name: row.shop_name || '',
+    created_by_email: undefined,
+    shop_code_full: undefined
+  }));
 }
 
-// Get invoice by id
+// Get invoice by id, with user email and shop name
 async function getInvoiceById(id) {
-  const [rows] = await pool.query('SELECT * FROM invoices WHERE id = ?', [id]);
-  return rows[0];
+  const [rows] = await pool.query(`
+    SELECT i.*, 
+      u.email AS created_by_email,
+      s.shop_name AS shop_name,
+      s.shop_code AS shop_code_full
+    FROM invoices i
+    LEFT JOIN users u ON i.created_by = u.id
+    LEFT JOIN shop_owners s ON i.shop_code = s.shop_code
+    WHERE i.id = ?
+  `, [id]);
+  if (!rows[0]) return undefined;
+  const row = rows[0];
+  return {
+    ...row,
+    created_by: row.created_by_email || row.created_by,
+    shop_code: row.shop_code_full || row.shop_code,
+    shop_name: row.shop_name || '',
+    created_by_email: undefined,
+    shop_code_full: undefined
+  };
 }
 
 // Update invoice (by id)

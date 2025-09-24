@@ -1,0 +1,137 @@
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+.sidebar {
+  width: 240px;
+  background: #222e3c;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding-top: 32px;
+}
+.sidebar-header {
+  margin-bottom: 2.5rem;
+  padding: 0 24px;
+}
+.shop-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.shop-code {
+  font-size: 1rem;
+  color: #60a5fa;
+  margin-bottom: 2px;
+}
+.shop-address {
+  font-size: 0.95rem;
+  color: #cbd5e1;
+}
+.sidebar-option {
+  padding: 18px 32px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-left: 4px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+.sidebar-option.active {
+  background: #1a2230;
+  border-left: 4px solid #3b82f6;
+  color: #3b82f6;
+}
+.dashboard-main {
+  flex: 1;
+  padding: 48px 32px;
+  background: #fff;
+  border-radius: 12px;
+  margin: 32px 32px 32px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.stat-boxes {
+  display: flex;
+  gap: 2.5rem;
+  margin-bottom: 2.5rem;
+}
+.stat-box {
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 24px 36px;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.stat-label {
+  font-size: 1.1rem;
+  color: #222e3c;
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2563eb;
+}
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.invoice-table th, .invoice-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+.invoice-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+.invoice-link {
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 10px;
+  padding: 32px 28px 24px 28px;
+  min-width: 340px;
+  max-width: 90vw;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.13);
+  position: relative;
+}
+.details-table {
+  width: 100%;
+  margin: 18px 0 24px 0;
+  border-collapse: collapse;
+}
+.details-key {
+  font-weight: 600;
+  color: #222e3c;
+  padding-right: 18px;
+  text-transform: capitalize;
+}
+.close-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 10px;
+}
+.close-btn:hover {
+  background: #1d4ed8;
+}

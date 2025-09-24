@@ -11,7 +11,7 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
 
-  useEffect(() => {
+  const fetchUsers = () => {
     setLoading(true);
     if (tab === 'shopowners') {
       fetch('/api/admin/shopowners')
@@ -24,13 +24,23 @@ const UserManagement = () => {
         .then(data => setManagers(data))
         .finally(() => setLoading(false));
     }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    // eslint-disable-next-line
   }, [tab]);
 
   return (
     <div className="user-management-section">
       <div className="dashboard-header" style={{marginBottom:'1.2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <span>Users Management</span>
-        <button className="create-user-btn" onClick={()=>setShowSignup(true)}>Create User</button>
+        <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
+          <button onClick={fetchUsers} title="Refresh" style={{padding:'6px 14px',borderRadius:6,border:'1px solid #d1d5db',background:'#f3f4f6',cursor:'pointer',fontWeight:600}}>
+            &#x21bb; Refresh
+          </button>
+          <button className="create-user-btn" onClick={()=>setShowSignup(true)}>Create User</button>
+        </div>
       </div>
       <div style={{display:'flex',gap:'1rem',marginBottom:'1rem'}}>
         <button className={tab==='shopowners'?"user-tab-active":"user-tab-btn"} onClick={()=>setTab('shopowners')}>Shop Owners</button>

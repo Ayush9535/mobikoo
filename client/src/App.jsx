@@ -6,6 +6,7 @@ import Login from './Pages/AuthPages/Login';
 import Signup from './Pages/AuthPages/Signup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ManagerDashboard from './Pages/Manager/ManagerDashboard';
+import ShopOwnerDashboard from './Pages/ShopOwner/ShopOwnerDashboard';
 
 function parseJwt(token) {
   if (!token) return null;
@@ -27,6 +28,7 @@ function App() {
 
   const handleLogin = (jwt) => {
     setToken(jwt);
+    localStorage.setItem('token', jwt);
   };
 
   const payload = parseJwt(token);
@@ -42,6 +44,8 @@ function App() {
                 <Navigate to="/admin-dashboard" replace />
               ) : payload && payload.role === 'manager' ? (
                 <Navigate to="/manager-dashboard" replace />
+              ) : payload && payload.role === 'shopowner' ? (
+                <Navigate to="/shopowner-dashboard" replace />
               ) : (
                 <Navigate to="/" replace />
               )
@@ -59,7 +63,7 @@ function App() {
           path="/signup"
           element={
             token ? (
-              <Navigate to={payload && payload.role === 'admin' ? "/admin-dashboard" : "/"} replace />
+              <Navigate to={payload && payload.role === 'admin' ? "/admin-dashboard" : payload && payload.role === 'shopowner' ? "/shopowner-dashboard" : "/"} replace />
             ) : (
               <>
                 <Signup />
@@ -67,6 +71,22 @@ function App() {
                   <span>Back to <a href="/login" style={{color:'#2563eb'}}>Login</a></span>
                 </div>
               </>
+            )
+          }
+        />
+        <Route
+          path="/shopowner-dashboard"
+          element={
+            token && payload && payload.role === 'shopowner' ? (
+              <ShopOwnerDashboard shopOwner={{
+                shop_name: payload.shop_name,
+                shop_code: payload.shop_code,
+                shop_address: payload.shop_address,
+                email: payload.email,
+                contact_number: payload.contact_number
+              }} />
+            ) : (
+              <Navigate to="/login" replace />
             )
           }
         />
@@ -98,6 +118,8 @@ function App() {
                 <Navigate to="/admin-dashboard" replace />
               ) : payload && payload.role === 'manager' ? (
                 <Navigate to="/manager-dashboard" replace />
+              ) : payload && payload.role === 'shopowner' ? (
+                <Navigate to="/shopowner-dashboard" replace />
               ) : (
                 <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100vh',flexDirection:'column'}}>
                   <h2>Logged in successfully!</h2>

@@ -1,3 +1,31 @@
+// Bulk upload invoices (manager only)
+exports.bulkUploadInvoices = async (req, res) => {
+  const user = req.user;
+  if (!canEdit(user.role)) return res.status(403).json({ error: 'Forbidden' });
+  const invoices = req.body.invoices;
+  if (!Array.isArray(invoices)) return res.status(400).json({ error: 'Invalid data' });
+  const fields = [
+    'invoice_id', 'date', 'customer_name', 'customer_contact_number', 'customer_alt_contact_number',
+    'device_model_name', 'imei_number', 'device_price', 'payment_mode', 'shop_code'
+  ];
+  let success = 0, failed = 0;
+  let failed_ids = [];
+  for (const row of invoices) {
+    const data = {};
+    for (const f of fields) data[f] = row[f] !== undefined ? row[f] : null;
+    data.created_by = user.id;
+    data.warranty_duration = '2 years';
+    data.created_at = new Date();
+    try {
+      await createInvoice(data);
+      success++;
+    } catch {
+      failed++;
+      if (row.invoice_id) failed_ids.push(row.invoice_id);
+    }
+  }
+  res.json({ success, failed, failed_ids });
+};
 const { createInvoice, getAllInvoices, getInvoiceById, updateInvoice, deleteInvoice } = require('../models/invoice');
 const { getUserByEmail } = require('../models/user');
 
@@ -32,7 +60,12 @@ exports.getAllInvoices = async (req, res) => {
   const user = req.user;
   if (!canRead(user.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
-    const invoices = await getAllInvoices();
+    let invoices;
+    if (user.role === 'manager' && req.query.mine === '1') {
+      invoices = await getAllInvoices(user.id);
+    } else {
+      invoices = await getAllInvoices();
+    }
     res.json(invoices);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch invoices', details: err.message });
