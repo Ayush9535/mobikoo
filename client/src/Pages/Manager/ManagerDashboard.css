@@ -1,0 +1,108 @@
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+
+.sidebar {
+  width: 220px;
+  background: #222e3c;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding-top: 40px;
+}
+
+.sidebar-option {
+  padding: 18px 32px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-left: 4px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.sidebar-option.active {
+  background: #1a2230;
+  border-left: 4px solid #3b82f6;
+  color: #3b82f6;
+}
+
+.dashboard-main {
+  flex: 1;
+  padding: 48px 32px;
+  background: #fff;
+  border-radius: 12px;
+  margin: 32px 32px 32px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.invoice-form {
+  max-width: 480px;
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.invoice-form label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  color: #222e3c;
+}
+
+.invoice-form input {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.invoice-form input:focus {
+  border: 1.5px solid #3b82f6;
+}
+
+.invoice-form button {
+  margin-top: 12px;
+  padding: 12px 0;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.invoice-form button:hover {
+  background: #2563eb;
+}
+
+.dropdown {
+  position: absolute;
+  z-index: 10;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  margin-top: 2px;
+  width: 100%;
+  max-height: 180px;
+  overflow-y: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  list-style: none;
+  padding: 0;
+}
+
+.dropdown li {
+  padding: 10px 14px;
+  cursor: pointer;
+  color: #222e3c;
+}
+
+.dropdown li:hover {
+  background: #f1f5f9;
+}
