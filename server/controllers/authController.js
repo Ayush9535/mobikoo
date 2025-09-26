@@ -1,5 +1,38 @@
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const {
+  createUser,
+  getUserByEmail,
+  getShopOwnerByEmail,
+  getManagerByEmail,
+  getAdminByEmail,
+  setUserOTP,
+  updateUserPassword,
+  createAdmin,
+  createShopOwner,
+  createManager
+} = require('../models/user');
+const { sendEmail } = require('../utils/email');
 const { getAllShopOwners, getAllManagers } = require('../models/user');
-// Get all shop owners (admin)
+const { getShopOwnerByUserId, getManagerByUserId } = require('../models/user');
+
+// Get manager details
+exports.getManagerDetails = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const managerDetails = await getManagerByUserId(userId);
+    
+    if (!managerDetails) {
+      return res.status(404).json({ error: 'Manager not found' });
+    }
+    
+    res.json(managerDetails);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch manager details', details: err.message });
+  }
+};
+
 exports.getAllShopOwners = async (req, res) => {
   try {
     const shopOwners = await getAllShopOwners();
@@ -10,6 +43,21 @@ exports.getAllShopOwners = async (req, res) => {
 };
 
 // Get all managers (admin)
+// Get manager details
+exports.getManagerDetails = async (req, res) => {
+  try {
+    console.log('User email from token:', req.user.email);
+    const manager = await getManagerByEmail(req.user.email);
+    if (!manager) {
+      return res.status(404).json({ error: 'Manager not found' });
+    }
+    res.json(manager);
+  } catch (err) {
+    console.error('Error fetching manager details:', err);
+    res.status(500).json({ error: 'Failed to fetch manager details' });
+  }
+};
+
 exports.getAllManagers = async (req, res) => {
   try {
     const managers = await getAllManagers();
@@ -18,19 +66,31 @@ exports.getAllManagers = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch managers', details: err.message });
   }
 };
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const {
-  createUser,
-  getUserByEmail,
-  setUserOTP,
-  updateUserPassword,
-  createAdmin,
-  createShopOwner,
-  createManager
-} = require('../models/user');
-const { sendEmail } = require('../utils/email');
+
+// Get shop owner details by email
+exports.getShopOwnerDetails = async (req, res) => {
+  try {
+    const shopOwner = await getShopOwnerByEmail(req.user.email);
+    if (!shopOwner) {
+      return res.status(404).json({ error: 'Shop owner not found' });
+    }
+    res.json(shopOwner);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch shop owner details', details: err.message });
+  }
+};
+
+exports.getAdminDetails = async (req, res) => {
+  try {
+    const admin = await getAdminByEmail(req.user.email);
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found' });
+    }
+    res.json(admin);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch admin details', details: err.message });
+  }
+};
 
 exports.adminCreateUser = async (req, res) => {
   const { email, role, admin_name, admin_code, shop_name, shop_address, contact_number, manager_name } = req.body;

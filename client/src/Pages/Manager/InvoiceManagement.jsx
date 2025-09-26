@@ -1,33 +1,50 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import '../Admin/InvoiceManagement.css';
+import InvoiceDetailsModal from '../../components/InvoiceDetailsModal';
+import { RefreshCw } from 'lucide-react';
 
-const InvoiceDetailsModal = ({ invoice, onClose }) => {
-  if (!invoice) return null;
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <h3>Invoice Details</h3>
-        <table className="details-table">
-          <tbody>
-            {Object.entries(invoice).map(([key, value]) => (
-              <tr key={key}>
-                <td className="details-key">{key.replace(/_/g, ' ')}</td>
-                <td>{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button onClick={onClose} className="close-btn">Close</button>
-      </div>
-    </div>
-  );
-};
+const InvoiceTable = ({ invoices, onInvoiceClick }) => (
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead>
+        <tr className="bg-gray-50 text-left">
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice ID</th>
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Contact</th>
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Code</th>
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Device Model</th>
+          <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {invoices.map(inv => (
+          <tr key={inv.id} className="hover:bg-gray-50 transition-colors duration-150">
+            <td className="px-4 py-3 text-sm text-blue-600">
+              <a href="#" className="hover:underline" onClick={e => { e.preventDefault(); onInvoiceClick(inv); }}>
+                {inv.invoice_id}
+              </a>
+            </td>
+            <td className="px-4 py-3 text-sm text-gray-900">{inv.date ? inv.date.slice(0,10) : ''}</td>
+            <td className="px-4 py-3 text-sm text-gray-900">{inv.customer_name}</td>
+            <td className="px-4 py-3 text-sm text-gray-900">{inv.customer_contact_number}</td>
+            <td className="px-4 py-3 text-sm text-gray-900">{inv.shop_name}</td>
+            <td className="px-4 py-3 text-sm text-gray-900">{inv.shop_code}</td>
+            <td className="px-4 py-3 text-sm text-gray-900">{inv.device_model_name}</td>
+            <td className="px-4 py-3 text-sm text-gray-900">{inv.device_price}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
 
 export default function ManagerInvoiceManagement() {
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchInvoices = async () => {
     setLoading(true);
@@ -48,49 +65,69 @@ export default function ManagerInvoiceManagement() {
   }, []);
 
   return (
-    <div className="invoice-mgmt-root">
-      <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-        <h2 style={{margin:0}}>My Invoices</h2>
-        <button onClick={fetchInvoices} title="Refresh" style={{padding:'6px 14px',borderRadius:6,border:'1px solid #d1d5db',background:'#f3f4f6',cursor:'pointer',fontWeight:600}}>
-          &#x21bb; Refresh
-        </button>
+    <div className="space-y-6">
+      {/* All Invoices Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 font-poppins">All Invoices</h2>
+              <p className="text-sm text-gray-500 mt-1">Complete list of all transactions</p>
+            </div>
+            <button
+              onClick={fetchInvoices}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search invoices by ID, customer name, shop, model..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors duration-150"
+            />
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div className="p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600">Loading...</span>
+            </div>
+          ) : (
+            <InvoiceTable 
+              invoices={invoices.filter(invoice => 
+                searchTerm === '' ||
+                invoice.invoice_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                invoice.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                invoice.shop_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                invoice.shop_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                invoice.device_model_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                invoice.customer_contact_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (invoice.device_price?.toString() || '').toLowerCase().includes(searchTerm.toLowerCase())
+              )} 
+              onInvoiceClick={setSelectedInvoice} 
+            />
+          )}
+        </div>
       </div>
-      {loading ? <div>Loading...</div> : (
-        <table className="invoice-table">
-          <thead>
-            <tr>
-              <th>Invoice ID</th>
-              <th>Date</th>
-              <th>Customer Name</th>
-              <th>Customer Contact</th>
-              <th>Shop Name</th>
-              <th>Shop Code</th>
-              <th>Device Model</th>
-              <th>Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map(inv => (
-              <tr key={inv.id}>
-                <td>
-                  <a href="#" className="invoice-link" onClick={e => { e.preventDefault(); setSelectedInvoice(inv); }}>
-                    {inv.invoice_id}
-                  </a>
-                </td>
-                <td>{inv.date ? inv.date.slice(0,10) : ''}</td>
-                <td>{inv.customer_name}</td>
-                <td>{inv.customer_contact_number}</td>
-                <td>{inv.shop_name}</td>
-                <td>{inv.shop_code}</td>
-                <td>{inv.device_model_name}</td>
-                <td>{inv.device_price}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+
+      {/* Invoice Details Modal */}
       {selectedInvoice && (
-        <InvoiceDetailsModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
+        <InvoiceDetailsModal 
+          invoice={selectedInvoice} 
+          onClose={() => setSelectedInvoice(null)} 
+        />
       )}
     </div>
   );

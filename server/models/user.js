@@ -1,3 +1,5 @@
+const pool = require('../config/db');
+const { get } = require('../routes/auth');
 // Get all shop owners (for admin)
 async function getAllShopOwners() {
   const [rows] = await pool.query(`
@@ -19,7 +21,17 @@ async function getAllManagers() {
   `);
   return rows;
 }
-const pool = require('../config/db');
+
+// Get manager by email
+async function getManagerByEmail(email) {
+  const [rows] = await pool.query(`
+    SELECT m.*, u.email, u.role
+    FROM managers m
+    JOIN users u ON m.user_id = u.id
+    WHERE u.email = ?
+  `, [email]);
+  return rows[0];
+}
 
 // User roles: 'admin', 'user'
 // Table: users (id, email, password, role, otp, otp_expiry)
@@ -34,6 +46,16 @@ async function createUser(email, password, role = 'user') {
 
 async function getUserByEmail(email) {
   const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+  return rows[0];
+}
+
+async function getShopOwnerByEmail(email) {
+  const [rows] = await pool.query(`
+    SELECT s.*, u.email, u.role
+    FROM shop_owners s
+    JOIN users u ON s.user_id = u.id
+    WHERE u.email = ? AND u.role = 'shopowner'
+  `, [email]);
   return rows[0];
 }
 
@@ -78,15 +100,32 @@ async function getShopOwnerByUserId(userId) {
   return rows[0];
 }
 async function getManagerByUserId(userId) {
-  const [rows] = await pool.query('SELECT * FROM managers WHERE user_id = ?', [userId]);
+  const [rows] = await pool.query(`
+    SELECT m.*, u.email
+    FROM managers m
+    JOIN users u ON m.user_id = u.id
+    WHERE m.user_id = ?
+  `, [userId]);
+  return rows[0];
+}
+
+async function getAdminByEmail(email) {
+  const [rows] = await pool.query(`
+    SELECT a.*, u.email, u.role
+    FROM admins a
+    JOIN users u ON a.user_id = u.id
+    WHERE u.email = ?
+  `, [email]);
   return rows[0];
 }
 
 module.exports = {
   createUser,
   getUserByEmail,
-  setUserOTP,
-  updateUserPassword,
+  getManagerByUserId,
+  getAllManagers,
+  getAllShopOwners,
+  getShopOwnerByUserId,
   createAdmin,
   createShopOwner,
   createManager,
@@ -94,5 +133,8 @@ module.exports = {
   getShopOwnerByUserId,
   getManagerByUserId
   ,getAllShopOwners
-  ,getAllManagers
+  ,getAllManagers,
+  getShopOwnerByEmail,
+  getManagerByEmail,
+  getAdminByEmail,
 };
