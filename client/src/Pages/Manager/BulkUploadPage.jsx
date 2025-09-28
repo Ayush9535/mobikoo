@@ -104,7 +104,7 @@ export default function BulkUploadPage() {
     setResult(null);
     try {
       const resp = await axios.post('/api/invoices/bulk', { invoices: rows }, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
       const { success: succCount, failed: failCount, failed_ids } = resp.data || {};
       if (succCount > 0 && failCount === 0) {

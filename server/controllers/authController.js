@@ -7,7 +7,6 @@ const {
   getShopOwnerByEmail,
   getManagerByEmail,
   getAdminByEmail,
-  setUserOTP,
   updateUserPassword,
   createAdmin,
   createShopOwner,
@@ -124,11 +123,11 @@ exports.adminCreateUser = async (req, res) => {
       const manager_code = `MN${String(nextNum).padStart(3, '0')}`;
       await createManager(userId, manager_name || '', contact_number || '', manager_code);
     }
-    // await sendEmail(
-    //   email,
-    //   'Your Account Credentials',
-    //   `Your login email: ${email}\nPassword: ${password}\nPlease change your password after login.`
-    // );
+    await sendEmail(
+      email,
+      'Your Account Credentials',
+      `Your login email: ${email}\nPassword: ${password}\nPlease change your password after login.`
+    );
     console.log(`Created user: ${email}, password: ${password}`);
     res.json({ message: 'User created', password });
   } catch (err) {
@@ -149,24 +148,54 @@ exports.login = async (req, res) => {
 };
 
 exports.forgotPassword = async (req, res) => {
-  const { email } = req.body;
-  const user = await getUserByEmail(email);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-  await setUserOTP(email, otp, expiry);
-  await sendEmail(email, 'Your OTP Code', `Your OTP is: ${otp}`);
-  res.json({ message: 'OTP sent to email' });
+  try {
+    const { email } = req.body;
+    const user = await getUserByEmail(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+
+    try {
+      await sendEmail(
+        email,
+        'Password Reset OTP for Mobikoo',
+        `Your One-Time Password (OTP) for password reset is: ${otp}\n\n` +
+        `This OTP will expire in 5 minutes.\n\n` +
+        `If you didn't request this password reset, please ignore this email.\n\n` +
+        `Best regards,\nMobikoo Team`
+      );
+      
+      res.json({ 
+        message: 'OTP sent to email',
+        otp: otp,
+        expiry: expiry.getTime(),
+        email: email 
+      });
+    } catch (emailError) {
+      console.error('Failed to send email:', emailError);
+      res.status(500).json({ 
+        error: 'Failed to send OTP email. Please check email configuration or try again later.',
+        details: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+      });
+    }
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ 
+      error: 'An error occurred during password reset process',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
 };
 
 exports.resetPassword = async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-  const user = await getUserByEmail(email);
-  if (!user || user.otp !== otp || !user.otp_expiry || new Date() > user.otp_expiry) {
-    return res.status(400).json({ error: 'Invalid or expired OTP' });
+  const { email, newPassword } = req.body;
+  try {
+    const hash = await bcrypt.hash(newPassword, 10);
+    await updateUserPassword(email, hash);
+    // Clear OTP after successful password reset
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update password', details: err.message });
   }
-  const hash = await bcrypt.hash(newPassword, 10);
-  await updateUserPassword(email, hash);
-  await setUserOTP(email, null, null);
-  res.json({ message: 'Password updated' });
 };

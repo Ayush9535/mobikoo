@@ -50,7 +50,7 @@ export default function ManagerInvoiceManagement() {
     setLoading(true);
     try {
       const res = await axios.get('/api/invoices?mine=1', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
       setInvoices(res.data);
     } catch {

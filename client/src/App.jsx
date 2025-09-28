@@ -1,6 +1,7 @@
 
 import './App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import LandingPage from './Pages/LandingPage';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './Pages/AuthPages/Login';
@@ -8,6 +9,7 @@ import Signup from './Pages/AuthPages/Signup';
 import AdminDashboard from './Pages/Admin/AdminDashboard';
 import ManagerDashboard from './Pages/Manager/ManagerDashboard';
 import ShopOwnerDashboard from './Pages/ShopOwner/ShopOwnerDashboard';
+import PasswordReset from './Pages/AuthPages/PasswordReset';
 
 function App() {
   return (
@@ -19,12 +21,10 @@ function App() {
             <>
               <Login />
             </>
+            
           } />
-          <Route path="/signup" element={
-            <>
-              <Signup />
-            </>
-          } />
+
+          <Route path="/reset-password" element={<PasswordReset />} />
           
           {/* Protected routes */}
           <Route path="/admin-dashboard/*" element={
@@ -45,8 +45,11 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Default route */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          {/* Landing Page */}
+          <Route path="/" element={<LandingPage />} />
+          
+          {/* Fallback route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </Router>

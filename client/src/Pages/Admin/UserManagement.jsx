@@ -101,9 +101,9 @@ const UserManagement = () => {
         </div>
       </div>
       {showSignup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden transform transition-all">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-[#0000006e] bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 min-h-screen">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-auto overflow-y-auto max-h-[90vh] transform transition-all scale-100">
+            <div className="sticky top-0 z-10 bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Create New User</h3>
               <button
                 onClick={() => setShowSignup(false)}
@@ -114,8 +114,11 @@ const UserManagement = () => {
                 </svg>
               </button>
             </div>
-            <div className="p-6">
-              <Signup />
+            <div>
+              <Signup onClose={() => {
+                setShowSignup(false);
+                fetchUsers(); 
+              }} />
             </div>
           </div>
         </div>

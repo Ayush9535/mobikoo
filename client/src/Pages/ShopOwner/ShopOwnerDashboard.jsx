@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { BarChart3, FileText, RefreshCw, TrendingUp, Receipt, Store } from 'lucide-react';
 import InvoiceDetailsModal from '../../components/InvoiceDetailsModal';
 
-const InvoiceTable = ({ invoices, onInvoiceClick }) => (
+const InvoiceTable = ({ invoices, onInvoiceClick, isRecent = false }) => (
   <div className="overflow-x-auto">
     <table className="min-w-full divide-y divide-gray-200">
       <thead>
@@ -18,7 +18,7 @@ const InvoiceTable = ({ invoices, onInvoiceClick }) => (
         </tr>
       </thead>
       <tbody className="bg-white divide-y divide-gray-200">
-        {invoices.slice(0, 7).map(inv => (
+        {(isRecent ? invoices.slice(0, 7) : invoices).map(inv => (
           <tr key={inv.id} className="hover:bg-gray-50 transition-colors duration-150">
             <td className="px-4 py-3 text-sm text-blue-600">
               <a href="#" className="hover:underline" onClick={e => { e.preventDefault(); onInvoiceClick(inv); }}>
@@ -47,13 +47,18 @@ export default function ShopOwnerDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [loadingAll, setLoadingAll] = useState(true);
-  const [stats, setStats] = useState({ totalSales: 0, totalInvoices: 0 });
+  const [stats, setStats] = useState({
+    totalSales: 0,
+    totalInvoices: 0,
+    salesChange: 0,
+    invoicesChange: 0
+  });
 
   useEffect(() => {
     const fetchShopDetails = async () => {
       try {
         const response = await axios.get('/api/shopowner/details', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         setShopDetails(response.data);
       } catch (error) {
@@ -68,8 +73,8 @@ export default function ShopOwnerDashboard() {
     if (!shopDetails) return;
     setLoadingRecent(true);
     try {
-      const res = await axios.get(`/api/invoices?shop_code=${shopDetails.shop_code}&limit=6`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      const res = await axios.get(`/api/invoices?shop_code=${shopDetails.shop_code}&sort=date:desc`, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
       setRecentInvoices(res.data);
     } catch {
@@ -79,32 +84,52 @@ export default function ShopOwnerDashboard() {
     }
   };
 
+  const fetchStats = async () => {
+    if (!shopDetails) return;
+    try {
+      const res = await axios.get(`/api/stats/shopowner?shop_code=${shopDetails.shop_code}`, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
+      });
+      setStats({
+        totalSales: res.data.currentMonth.totalSales,
+        totalInvoices: res.data.currentMonth.totalInvoices,
+        salesChange: res.data.percentageChanges.salesChange,
+        invoicesChange: res.data.percentageChanges.invoicesChange
+      });
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+      setStats({
+        totalSales: 0,
+        totalInvoices: 0,
+        salesChange: 0,
+        invoicesChange: 0
+      });
+    }
+  };
+
   const fetchAllInvoices = async () => {
     if (!shopDetails) return;
     setLoadingAll(true);
     try {
       const res = await axios.get(`/api/invoices?shop_code=${shopDetails.shop_code}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
       setAllInvoices(res.data);
-      // Calculate stats
-      let totalSales = 0;
-      res.data.forEach(inv => {
-        const price = parseFloat(inv.device_price) || 0;
-        totalSales += price;
-      });
-      setStats({ totalSales, totalInvoices: res.data.length });
     } catch {
       setAllInvoices([]);
-      setStats({ totalSales: 0, totalInvoices: 0 });
     } finally {
       setLoadingAll(false);
     }
   };
 
   useEffect(() => {
-    if (sidebarTab === 'dashboard' && shopDetails) fetchRecentInvoices();
-    if (shopDetails) fetchAllInvoices();
+    if (!shopDetails) return;
+    
+    if (sidebarTab === 'dashboard') {
+      fetchRecentInvoices();
+      fetchStats();
+    }
+    fetchAllInvoices();
     // eslint-disable-next-line
   }, [sidebarTab, shopDetails]);
 
@@ -177,7 +202,7 @@ export default function ShopOwnerDashboard() {
           <div className="mt-auto p-4 border-t border-gray-200">
             <button
               onClick={() => {
-                localStorage.removeItem('token');
+                sessionStorage.removeItem('token');
                 window.location.href = '/login';
               }}
               className="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -207,7 +232,7 @@ export default function ShopOwnerDashboard() {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">Total Sales</p>
+                      <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (Current Month)</p>
                       <p className="text-2xl font-bold text-gray-900">₹{stats.totalSales.toLocaleString()}</p>
                     </div>
                     <div className="p-3 bg-green-100 rounded-lg">
@@ -215,15 +240,21 @@ export default function ShopOwnerDashboard() {
                     </div>
                   </div>
                   <div className="mt-4 flex items-center">
-                    <span className="text-xs text-green-600 font-medium">↑ 12%</span>
-                    <span className="text-xs text-gray-500 ml-2">vs last month</span>
+                    {stats.salesChange !== 0 && (
+                      <>
+                        <span className={`text-xs font-medium ${stats.salesChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {stats.salesChange >= 0 ? '↑' : '↓'} {Math.abs(stats.salesChange)}%
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">vs last month</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">Total Invoices</p>
+                      <p className="text-sm font-medium text-gray-500 mb-1">Total Invoices (Current Month)</p>
                       <p className="text-2xl font-bold text-gray-900">{stats.totalInvoices}</p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-lg">
@@ -231,8 +262,14 @@ export default function ShopOwnerDashboard() {
                     </div>
                   </div>
                   <div className="mt-4 flex items-center">
-                    <span className="text-xs text-blue-600 font-medium">↑ 8%</span>
-                    <span className="text-xs text-gray-500 ml-2">vs last month</span>
+                    {stats.invoicesChange !== 0 && (
+                      <>
+                        <span className={`text-xs font-medium ${stats.invoicesChange >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {stats.invoicesChange >= 0 ? '↑' : '↓'} {Math.abs(stats.invoicesChange)}%
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">vs last month</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -262,7 +299,7 @@ export default function ShopOwnerDashboard() {
                       <span className="ml-3 text-gray-600">Loading...</span>
                     </div>
                   ) : (
-                    <InvoiceTable invoices={recentInvoices} onInvoiceClick={setSelectedInvoice} />
+                    <InvoiceTable invoices={recentInvoices} onInvoiceClick={setSelectedInvoice} isRecent={true} />
                   )}
                 </div>
               </div>

@@ -11,8 +11,10 @@ app.use(express.json());
 // Routes
 const authRoutes = require('./routes/auth');
 const invoiceRoutes = require('./routes/invoice');
+const statsRoutes = require('./routes/stats');
 app.use('/api', authRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/stats', statsRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running');

@@ -107,7 +107,7 @@ export default function AdminDashboard() {
     setLoadingActivities(true);
     try {
       const response = await axios.get('/api/invoices/recent', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
       setRecentActivities(response.data);
     } catch (error) {
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
     const fetchAdminDetails = async () => {
       try {
         const response = await axios.get('/api/admin/details', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
         setAdminDetails(response.data);
       } catch (error) {
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
       setLoadingStats(true);
       try {
         const [invoiceRes, shopRes, managerRes] = await Promise.all([
-          axios.get('/api/invoices', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+          axios.get('/api/invoices', { headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` } }),
           axios.get('/api/admin/shopowners'),
           axios.get('/api/admin/managers'),
           // axios.get('/api/admin/users'),
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
       
       <div className="flex h-screen">
         {/* Sidebar */}
-        <aside className="w-64 bg-white shadow-sm border-r border-gray-200 flex-shrink-0 flex flex-col custom-scrollbar">
+        <aside className="w-72 bg-white shadow-sm border-r border-gray-200 flex-shrink-0 flex flex-col custom-scrollbar">
           {/* Admin Info Header */}
           <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-blue-50 to-white">
             <div className="flex items-center mb-3">
@@ -251,11 +251,11 @@ export default function AdminDashboard() {
                 <Shield className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 font-poppins text-sm leading-tight">
+                <h3 className="font-semibold text-gray-900 font-poppins text-sm leading-tight truncate max-w-[180px]">
                   {adminDetails ? adminDetails.admin_name : 'Loading...'}
                 </h3>
-                <p className="text-xs text-blue-600 font-medium">{adminDetails ? adminDetails.admin_code : 'Loading...'}</p>
-                <p className="text-xs text-gray-500 mt-1">System Administrator</p>
+                <p className="text-xs text-blue-600 font-medium truncate max-w-[180px]">{adminDetails ? adminDetails.admin_code : 'Loading...'}</p>
+                <p className="text-xs text-gray-500 mt-1 truncate">System Administrator</p>
               </div>
             </div>
           </div>
@@ -270,14 +270,14 @@ export default function AdminDashboard() {
                   <button
                     key={option.key}
                     onClick={() => setCurrentView(option.key)}
-                    className={`w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
+                    className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                     }`}
                   >
-                    <Icon className="w-4 h-4 mr-3" />
-                    {option.label}
+                    <Icon className="w-4 h-4 flex-shrink-0 mr-2.5" />
+                    <span className="truncate">{option.label}</span>
                   </button>
                 );
               })}
@@ -288,7 +288,7 @@ export default function AdminDashboard() {
           <div className="mt-auto p-4 border-t border-gray-200">
             <button
               onClick={() => {
-                localStorage.removeItem('token');
+                sessionStorage.removeItem('token');
                 window.location.href = '/login';
               }}
               className="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium text-red-600 hover:bg-red-50"

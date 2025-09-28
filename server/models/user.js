@@ -131,10 +131,11 @@ module.exports = {
   createManager,
   getAdminByUserId,
   getShopOwnerByUserId,
-  getManagerByUserId
-  ,getAllShopOwners
-  ,getAllManagers,
+  getManagerByUserId,
+  getAllShopOwners,
+  getAllManagers,
   getShopOwnerByEmail,
   getManagerByEmail,
   getAdminByEmail,
+  updateUserPassword
 };

@@ -171,17 +171,15 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Forgot Password Link */}
-          <div className="flex items-center justify-end">
-            <a 
-              href="#" 
-              className="text-sm text-blue-600 hover:text-blue-700 transition-colors duration-200 font-medium"
-            >
-              Forgot your password?
-            </a>
-          </div>
-
-          {/* Error Message */}
+            {/* Forgot Password Link */}
+            <div className="flex items-center justify-end">
+              <a 
+                href="/reset-password" 
+                className="text-sm text-blue-600 hover:text-blue-700 transition-colors duration-200 font-medium"
+              >
+                Forgot your password?
+              </a>
+            </div>          {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
               <div className="flex items-center">

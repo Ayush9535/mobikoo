@@ -27,7 +27,7 @@ const ManagerDashboard = () => {
   useEffect(() => {
     // Fetch manager details
     axios.get('/api/manager/details', {headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${sessionStorage.getItem('token')}`
     }})
       .then(res => setManagerDetails(res.data))
       .catch(err => console.error('Failed to fetch manager details:', err));
@@ -86,7 +86,7 @@ const ManagerDashboard = () => {
     // Submit invoice form
     try {
       await axios.post('/api/invoices', form, {headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`
       }});
       alert('Invoice created successfully!');
       setForm({
@@ -221,20 +221,20 @@ const ManagerDashboard = () => {
               <div className="p-2 bg-blue-100 rounded-lg mr-3">
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 font-poppins text-sm">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-gray-900 font-poppins text-sm truncate">
                   {managerDetails ? managerDetails.manager_name : 'Loading...'}
                 </h3>
-                <p className="text-xs text-blue-600 font-medium">
+                <p className="text-xs text-blue-600 font-medium truncate">
                   {managerDetails ? managerDetails.manager_code : ''}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 truncate">
                   {managerDetails ? managerDetails.email : ''}
                 </p>
               </div>
             </div>
           </div>
-          
+
           {/* Navigation */}
           <nav className="p-4">
             <div className="space-y-2">
@@ -280,7 +280,7 @@ const ManagerDashboard = () => {
           <div className="mt-auto p-4 border-t border-gray-200">
             <button
               onClick={() => {
-                localStorage.removeItem('token');
+                sessionStorage.removeItem('token');
                 window.location.href = '/login';
               }}
               className="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -383,7 +383,7 @@ const ManagerDashboard = () => {
                           <option value="">Select Shop Owner</option>
                           {shopOwners.map(owner => (
                             <option key={owner.shop_code} value={owner.shop_code}>
-                              {owner.shop_code} - {owner.name}
+                              {owner.shop_code} - {owner.shop_name}
                             </option>
                           ))}
                         </select>

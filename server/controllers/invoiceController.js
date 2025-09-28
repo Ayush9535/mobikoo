@@ -1,3 +1,6 @@
+const pool = require('../config/db');
+const jwt = require('jsonwebtoken');
+
 // Bulk upload invoices (manager only)
 exports.bulkUploadInvoices = async (req, res) => {
   const user = req.user;
@@ -61,13 +64,46 @@ exports.getAllInvoices = async (req, res) => {
   if (!canRead(user.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     let invoices;
-    if (user.role === 'manager' && req.query.mine === '1') {
+    if (user.role === 'shopowner') {
+      // Get shop_code for the shop owner
+      const [shopOwner] = await pool.query(
+        'SELECT shop_code FROM shop_owners WHERE user_id = ?',
+        [user.id]
+      );
+      if (!shopOwner || !shopOwner[0]) {
+        return res.status(404).json({ error: 'Shop owner details not found' });
+      }
+      const shop_code = shopOwner[0].shop_code;
+      
+      // Get invoices for this shop
+      let orderBy = 'i.created_at DESC';
+      if (req.query.sort) {
+        const [field, order] = req.query.sort.split(':');
+        // Only allow certain fields to be sorted
+        const allowedFields = ['date', 'created_at', 'invoice_id', 'customer_name', 'device_price'];
+        const allowedOrders = ['asc', 'desc'];
+        if (allowedFields.includes(field) && allowedOrders.includes(order.toLowerCase())) {
+          orderBy = `i.${field} ${order.toUpperCase()}`;
+        }
+      }
+
+      const [rows] = await pool.query(
+        `SELECT i.*, s.shop_name 
+         FROM invoices i 
+         LEFT JOIN shop_owners s ON i.shop_code = s.shop_code 
+         WHERE i.shop_code = ?
+         ORDER BY ${orderBy}`,
+        [shop_code]
+      );
+      invoices = rows;
+    } else if (user.role === 'manager' && req.query.mine === '1') {
       invoices = await getAllInvoices(user.id);
     } else {
       invoices = await getAllInvoices();
     }
     res.json(invoices);
   } catch (err) {
+    console.error('Error fetching invoices:', err);
     res.status(500).json({ error: 'Failed to fetch invoices', details: err.message });
   }
 };
