@@ -1,23 +1,3 @@
--- ALTER TABLE for invoices (run these if table already exists)
-ALTER TABLE invoices ADD COLUMN shop_code VARCHAR(20);
-ALTER TABLE invoices ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
--- Invoices table
-CREATE TABLE IF NOT EXISTS invoices (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  invoice_id VARCHAR(20) NOT NULL,
-  date DATE NOT NULL,
-  customer_name VARCHAR(255) NOT NULL,
-  customer_contact_number VARCHAR(20) NOT NULL,
-  customer_alt_contact_number VARCHAR(20),
-  device_model_name VARCHAR(255) NOT NULL,
-  imei_number VARCHAR(50) NOT NULL,
-  device_price DECIMAL(10,2) NOT NULL,
-  payment_mode VARCHAR(50) NOT NULL,
-  warranty_duration VARCHAR(20) NOT NULL DEFAULT '2 years',
-  created_by INT,
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
 -- Unified users table
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -64,3 +44,25 @@ VALUES ('admin1@example.com', '$2a$10$Vo4paXhhBa7ftdO6/4hgq.talVo4JYtOfXcVG5/2pF
 -- Step 2: Insert into admins table (linking to users.id)
 INSERT INTO admins (user_id, admin_name, admin_code)
 VALUES (LAST_INSERT_ID(), 'Mobikoo Admin', 'ADM001');
+
+
+-- Invoices table
+CREATE TABLE IF NOT EXISTS invoices (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  invoice_id VARCHAR(20) NOT NULL,
+  date DATE NOT NULL,
+  customer_name VARCHAR(255) NOT NULL,
+  customer_contact_number VARCHAR(20) NOT NULL,
+  customer_alt_contact_number VARCHAR(20),
+  device_model_name VARCHAR(255) NOT NULL,
+  imei_number VARCHAR(50) NOT NULL,
+  device_price DECIMAL(10,2) NOT NULL,
+  payment_mode VARCHAR(50) NOT NULL,
+  warranty_duration VARCHAR(20) NOT NULL DEFAULT '2 years',
+  created_by INT,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- ALTER TABLE for invoices (run these if table already exists)
+ALTER TABLE invoices ADD COLUMN shop_code VARCHAR(20);
+ALTER TABLE invoices ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
