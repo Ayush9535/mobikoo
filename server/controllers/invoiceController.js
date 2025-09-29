@@ -1,6 +1,44 @@
 const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
 
+// Validation helper function
+function validateInvoiceData(data) {
+  const errors = [];
+
+  // Phone number validation (10 digits)
+  if (!data.customer_contact_number || !/^\d{10}$/.test(data.customer_contact_number)) {
+    errors.push('Customer contact number must be exactly 10 digits');
+  }
+
+  // Alt phone number validation (if provided)
+  if (data.customer_alt_contact_number && !/^\d{10}$/.test(data.customer_alt_contact_number)) {
+    errors.push('Alternative contact number must be exactly 10 digits');
+  }
+
+  // IMEI validation (15 digits)
+  if (!data.imei_number || !/^\d{15}$/.test(data.imei_number)) {
+    errors.push('IMEI number must be exactly 15 digits');
+  }
+
+  // Device price validation
+  if (!data.device_price || parseFloat(data.device_price) <= 0) {
+    errors.push('Device price must be greater than 0');
+  }
+
+  // Payment mode validation
+  const validPaymentModes = ['CASH', 'UPI', 'BANK_TRANSFER', 'CARD'];
+  if (!data.payment_mode || !validPaymentModes.includes(data.payment_mode.toUpperCase())) {
+    errors.push('Payment mode must be one of: CASH, UPI, BANK_TRANSFER, CARD');
+  }
+
+  // Required fields validation
+  if (!data.customer_name?.trim()) errors.push('Customer name is required');
+  if (!data.device_model_name?.trim()) errors.push('Device model name is required');
+  if (!data.date) errors.push('Date is required');
+
+  return errors;
+}
+
 // Bulk upload invoices (manager only)
 exports.bulkUploadInvoices = async (req, res) => {
   const user = req.user;
@@ -8,15 +46,37 @@ exports.bulkUploadInvoices = async (req, res) => {
   const invoices = req.body.invoices;
   if (!Array.isArray(invoices)) return res.status(400).json({ error: 'Invalid data' });
   
-  // Get all invoice_ids from the request
-  const requestInvoiceIds = invoices.map(inv => inv.invoice_id).filter(id => id);
+  // Validate shop codes first
+  const uniqueShopCodes = new Set(invoices.map(inv => inv.shop_code).filter(Boolean));
   
-  // Check for existing invoice_ids
-  const [existingInvoices] = await pool.query(
-    'SELECT invoice_id FROM invoices WHERE invoice_id IN (?)',
-    [requestInvoiceIds]
+  // Verify all shop codes exist
+  const [validShops] = await pool.query(
+    'SELECT shop_code FROM shop_owners WHERE shop_code IN (?)',
+    [Array.from(uniqueShopCodes)]
   );
-  const existingInvoiceIds = new Set(existingInvoices.map(inv => inv.invoice_id));
+  
+  const validShopCodes = new Set(validShops.map(shop => shop.shop_code));
+  const invalidShopCodes = Array.from(uniqueShopCodes).filter(code => !validShopCodes.has(code));
+  
+  if (invalidShopCodes.length > 0) {
+    return res.status(400).json({
+      error: 'Invalid shops',
+      message: `The following shop codes do not exist: ${invalidShopCodes.join(', ')}`,
+      invalidShopCodes
+    });
+  }
+
+  // Get all invoice_ids and shop_codes from the request
+  const requestInvoices = invoices.filter(inv => inv.invoice_id && inv.shop_code);
+  
+  // Check for existing invoice_ids in the same shop
+  const [existingInvoices] = await pool.query(
+    'SELECT invoice_id, shop_code FROM invoices WHERE (invoice_id, shop_code) IN (?)',
+    [requestInvoices.map(inv => [inv.invoice_id, inv.shop_code])]
+  );
+  
+  // Create a Set of invoice_id-shop_code combinations
+  const existingCombos = new Set(existingInvoices.map(inv => `${inv.invoice_id}-${inv.shop_code}`));
 
   const fields = [
     'invoice_id', 'date', 'customer_name', 'customer_contact_number', 'customer_alt_contact_number',
@@ -25,12 +85,13 @@ exports.bulkUploadInvoices = async (req, res) => {
   let success = 0, failed = 0;
   let failed_ids = [];
   let duplicate_ids = [];
+  let validation_errors = [];  // Track validation errors per invoice
 
   for (const row of invoices) {
-    // Skip if invoice_id already exists
-    if (row.invoice_id && existingInvoiceIds.has(row.invoice_id)) {
+    // Skip if invoice_id already exists for this shop
+    if (row.invoice_id && row.shop_code && existingCombos.has(`${row.invoice_id}-${row.shop_code}`)) {
       failed++;
-      duplicate_ids.push(row.invoice_id);
+      duplicate_ids.push(`${row.invoice_id} (Shop: ${row.shop_code})`);
       continue;
     }
 
@@ -39,20 +100,50 @@ exports.bulkUploadInvoices = async (req, res) => {
     data.created_by = user.id;
     data.warranty_duration = '2 years';
     data.created_at = new Date();
+
+    // Normalize payment mode to uppercase
+    if (data.payment_mode) data.payment_mode = data.payment_mode.toUpperCase();
+
+    // Validate invoice data
+    const validationErrors = validateInvoiceData(data);
+    
+    if (validationErrors.length > 0) {
+      failed++;
+      validation_errors.push({
+        invoice_id: row.invoice_id || 'Unknown',
+        errors: validationErrors
+      });
+      continue;
+    }
+
     try {
       await createInvoice(data);
       success++;
-    } catch {
+    } catch (error) {
       failed++;
       if (row.invoice_id) failed_ids.push(row.invoice_id);
+      validation_errors.push({
+        invoice_id: row.invoice_id || 'Unknown',
+        errors: [error.message]
+      });
     }
   }
+  // Prepare response message
+  let message = [];
+  if (duplicate_ids.length > 0) {
+    message.push(`${duplicate_ids.length} invoices skipped due to duplicate invoice IDs`);
+  }
+  if (validation_errors.length > 0) {
+    message.push(`${validation_errors.length} invoices failed validation`);
+  }
+
   res.json({ 
     success, 
     failed, 
     failed_ids,
     duplicate_ids,
-    message: duplicate_ids.length > 0 ? `${duplicate_ids.length} invoices skipped due to duplicate invoice IDs` : undefined
+    validation_errors,
+    message: message.length > 0 ? message.join('. ') : undefined
   });
 };
 const { createInvoice, getAllInvoices, getInvoiceById, updateInvoice, deleteInvoice } = require('../models/invoice');
@@ -73,10 +164,48 @@ exports.createInvoice = async (req, res) => {
   if (!canEdit(user.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const data = req.body;
+    
+    // First verify if the shop_code exists
+    if (!data.shop_code) {
+      return res.status(400).json({ 
+        error: 'Invalid shop', 
+        message: 'Shop code is required'
+      });
+    }
+
+    // Verify shop exists
+    const [shopExists] = await pool.query(
+      'SELECT shop_code FROM shop_owners WHERE shop_code = ?',
+      [data.shop_code]
+    );
+
+    if (!shopExists || shopExists.length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid shop', 
+        message: `Shop with code ${data.shop_code} does not exist`
+      });
+    }
+    
+    // Check if invoice_id already exists for this shop
+    if (data.invoice_id && data.shop_code) {
+      const [existing] = await pool.query(
+        'SELECT invoice_id FROM invoices WHERE invoice_id = ? AND shop_code = ?',
+        [data.invoice_id, data.shop_code]
+      );
+      
+      if (existing && existing.length > 0) {
+        return res.status(400).json({ 
+          error: 'Duplicate invoice', 
+          message: `An invoice with ID ${data.invoice_id} already exists for shop ${data.shop_code}`,
+          isDuplicate: true
+        });
+      }
+    }
+
     data.created_by = user.id;
     data.warranty_duration = '2 years';
     if (!data.created_at) data.created_at = new Date();
-    // invoice_id and shop_code come from frontend
+    
     const id = await createInvoice(data);
     res.json({ id, invoice_id: data.invoice_id });
   } catch (err) {

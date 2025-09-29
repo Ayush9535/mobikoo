@@ -12,6 +12,7 @@ export default function BulkUploadPage() {
   const [failedIds, setFailedIds] = useState(null);
   const [duplicateIds, setDuplicateIds] = useState(null);
   const [reading, setReading] = useState(false);
+  const [invalidShopCodes, setInvalidShopCodes] = useState(null);
 
   const fieldMap = {
     invoice_id: ['invoice id', 'invoice_id', 'InvoiceID', 'Invoice Id', 'Invoice_Id', 'Invoiceid'],
@@ -42,7 +43,7 @@ export default function BulkUploadPage() {
     setError('');
     setSuccess('');
     setRows([]);
-    setResult(null);
+    // setResult(null);
   };
 
   const handleReadExcel = async () => {
@@ -98,19 +99,45 @@ export default function BulkUploadPage() {
     }
   };
 
+  const [validationErrors, setValidationErrors] = useState({});
+
   const handleSubmit = async () => {
     setUploading(true);
     setError('');
     setSuccess('');
     setFailedIds(null);
     setDuplicateIds(null);
+    setValidationErrors({});
+    setInvalidShopCodes(null);
     try {
       const resp = await axios.post('/api/invoices/bulk', { invoices: rows }, {
         headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
-      const { success: succCount, failed: failCount, failed_ids, duplicate_ids, message } = resp.data || {};
-      const totalFailed = (failed_ids?.length || 0) + (duplicate_ids?.length || 0);
+      const { success: succCount, failed: failCount, failed_ids, duplicate_ids, validation_errors, message } = resp.data || {};
 
+      // Process validation errors first
+      if (validation_errors) {
+        const errorsMap = {};
+        const failedValidationIds = [];
+        validation_errors.forEach(item => {
+          failedValidationIds.push(item.invoice_id);
+          errorsMap[item.invoice_id] = item.errors;
+        });
+        setValidationErrors(errorsMap);
+        setFailedIds(failedValidationIds);
+        
+        if (succCount === 0) {
+          setSuccess('');
+          setError('Bulk upload failed. Please correct the validation errors and try again.');
+        } else {
+          setSuccess(`Partial success: ${succCount} uploaded, ${failedValidationIds.length} failed.`);
+          setError('Some invoices failed validation. See details below.');
+        }
+        return;
+      }
+
+      // Handle other cases
+      const totalFailed = (failed_ids?.length || 0) + (duplicate_ids?.length || 0);
       if (succCount > 0 && totalFailed === 0) {
         setSuccess(`Bulk upload successful! (${succCount} invoices uploaded)`);
         setError('');
@@ -130,7 +157,13 @@ export default function BulkUploadPage() {
       setSuccess('');
       setFailedIds(null);
       setDuplicateIds(null);
-      setError('Bulk upload failed. Please check your file and try again.');
+      setValidationErrors({});
+      if (err.response?.data?.error === 'Invalid shops') {
+        setError('Some shop codes are invalid. Please correct them and try again.');
+        setInvalidShopCodes(err.response.data.invalidShopCodes);
+      } else {
+        setError('Bulk upload failed. Please check your file and try again.');
+      }
     } finally {
       setUploading(false);
     }
@@ -250,9 +283,83 @@ export default function BulkUploadPage() {
         </div>
       )}
 
+      {/* Failed Results */}
+      {(failedIds?.length > 0 || duplicateIds?.length > 0 || invalidShopCodes?.length > 0) && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 font-poppins flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2 text-yellow-600" />
+              Upload Results
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Summary of invoices that couldn't be processed
+            </p>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            {invalidShopCodes?.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                <h4 className="text-sm font-medium text-orange-900 mb-2">Invalid Shop Codes</h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {invalidShopCodes.map(code => (
+                    <span key={code} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+                      {code}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-orange-700">
+                  These shop codes do not exist in the system. Please verify the shop codes and try again.
+                </p>
+              </div>
+            )}
+            
+            {duplicateIds?.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-yellow-900 mb-2">Duplicate Invoices</h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {duplicateIds.map(id => (
+                    <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                      {id}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-yellow-700">
+                  These invoice IDs already exist in the system and were skipped.
+                </p>
+              </div>
+            )}
+            
+            {failedIds?.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-red-900 mb-2">Failed Invoices</h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {failedIds.map(id => (
+                    <div key={id} className="w-full">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 mb-2">
+                        {id}
+                      </span>
+                      {validationErrors[id] && (
+                        <ul className="list-disc list-inside text-sm text-red-700 ml-4">
+                          {validationErrors[id].map((error, index) => (
+                            <li key={`${id}-${index}`}>{error}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-red-700">
+                  These invoices failed to upload due to validation errors. Please correct the data and try again.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Preview Section */}
       {rows.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
@@ -310,55 +417,6 @@ export default function BulkUploadPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Failed Results */}
-      {(failedIds?.length > 0 || duplicateIds?.length > 0) && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 font-poppins flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2 text-yellow-600" />
-              Upload Results
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Summary of invoices that couldn't be processed
-            </p>
-          </div>
-          
-          <div className="p-6 space-y-6">
-            {duplicateIds?.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-yellow-900 mb-2">Duplicate Invoices</h4>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {duplicateIds.map(id => (
-                    <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                      {id}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-sm text-yellow-700">
-                  These invoice IDs already exist in the system and were skipped.
-                </p>
-              </div>
-            )}
-            
-            {failedIds?.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-red-900 mb-2">Failed Invoices</h4>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {failedIds.map(id => (
-                    <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                      {id}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-sm text-red-700">
-                  These invoices failed to upload due to errors. Please check the data and try again.
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}

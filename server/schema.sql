@@ -4,7 +4,7 @@ ALTER TABLE invoices ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 -- Invoices table
 CREATE TABLE IF NOT EXISTS invoices (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  invoice_id VARCHAR(20) NOT NULL UNIQUE,
+  invoice_id VARCHAR(20) NOT NULL,
   date DATE NOT NULL,
   customer_name VARCHAR(255) NOT NULL,
   customer_contact_number VARCHAR(20) NOT NULL,

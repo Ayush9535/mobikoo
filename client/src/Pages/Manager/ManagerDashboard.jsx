@@ -80,14 +80,80 @@ const ManagerDashboard = () => {
 
   // Remove handleShopSelect
 
+  const [error, setError] = useState('');
+  
+  const validateForm = () => {
+    // Check required fields
+    const requiredFields = {
+      invoice_id: 'Invoice ID',
+      date: 'Date',
+      customer_name: 'Customer Name',
+      customer_contact_number: 'Customer Contact Number',
+      device_model_name: 'Device Model Name',
+      imei_number: 'IMEI Number',
+      device_price: 'Device Price',
+      payment_mode: 'Payment Mode',
+      shop_code: 'Shop'
+    };
+
+    for (const [field, label] of Object.entries(requiredFields)) {
+      if (!form[field]?.trim()) {
+        setError(`${label} is required.`);
+        return false;
+      }
+    }
+
+    // Validate customer name format
+    if (!/^[A-Za-z\s\-'.]+$/.test(form.customer_name)) {
+      setError('Customer name should only contain letters, spaces, and characters like - . \'');
+      return false;
+    }
+
+    // Validate contact number length
+    if (form.customer_contact_number.length !== 10) {
+      setError('Customer contact number must be exactly 10 digits.');
+      return false;
+    }
+
+    // Validate alternative contact number if provided
+    if (form.customer_alt_contact_number && form.customer_alt_contact_number.length !== 10) {
+      setError('Alternative contact number must be exactly 10 digits.');
+      return false;
+    }
+
+    // Validate IMEI number (assuming standard 15-digit IMEI)
+    if (!/^\d{15}$/.test(form.imei_number)) {
+      setError('IMEI number must be exactly 15 digits.');
+      return false;
+    }
+
+    // Validate device price
+    if (parseFloat(form.device_price) <= 0) {
+      setError('Device price must be greater than 0.');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async e => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSubmitting(true);
+    setError('');
+    
     // Submit invoice form
     try {
-      await axios.post('/api/invoices', form, {headers: {
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`
-      }});
+      await axios.post('/api/invoices', form, {
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        }
+      });
+      
       alert('Invoice created successfully!');
       setForm({
         invoice_id: '',
@@ -104,7 +170,11 @@ const ManagerDashboard = () => {
         created_at: '',
       });
     } catch (err) {
-      alert('Failed to create invoice');
+      if (err.response?.data?.isDuplicate) {
+        setError(err.response?.data?.message || 'This invoice ID already exists for this shop. Please use a different invoice ID.');
+      } else {
+        setError('Failed to create invoice. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -311,6 +381,22 @@ const ManagerDashboard = () => {
                   <p className="text-sm text-gray-500 mt-1">Fill in the information below to create a new invoice</p>
                 </div>
                 
+                {error && (
+                  <div className="mx-6 mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-red-800">Error</h3>
+                        <p className="text-sm text-red-700 mt-1">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div onSubmit={handleSubmit} className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {formFields.map(field => {
@@ -411,6 +497,7 @@ const ManagerDashboard = () => {
                             shop_code: '',
                             created_at: '',
                           });
+                          setError(''); // Clear any existing error message
                         }
                       }}
                       className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"

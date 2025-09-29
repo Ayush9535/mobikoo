@@ -105,20 +105,20 @@ exports.adminCreateUser = async (req, res) => {
     if (role === 'admin') {
       await createAdmin(userId, admin_name || '', admin_code || null);
     } else if (role === 'shopowner') {
-      // Auto-generate shop_code: SP001, SP002, ... (find max numeric part)
+      // Auto-generate shop_code: SP101, SP102, ... (find max numeric part)
       const [rows] = await pool.query("SELECT MAX(CAST(SUBSTRING(shop_code, 3) AS UNSIGNED)) as max_code FROM shop_owners");
-      let nextNum = 1;
+      let nextNum = 101; // Start from 101
       if (rows.length && rows[0].max_code) {
-        nextNum = rows[0].max_code + 1;
+        nextNum = Math.max(rows[0].max_code + 1, 101); // Ensure it's at least 101
       }
       const shop_code = `SP${String(nextNum).padStart(3, '0')}`;
       await createShopOwner(userId, shop_name || '', shop_address || '', contact_number || '', shop_code);
     } else if (role === 'manager') {
-      // Auto-generate manager_code: MN001, MN002, ... (find max numeric part)
+      // Auto-generate manager_code: MN101, MN102, ... (find max numeric part)
       const [rows] = await pool.query("SELECT MAX(CAST(SUBSTRING(manager_code, 3) AS UNSIGNED)) as max_code FROM managers");
-      let nextNum = 1;
+      let nextNum = 101; // Start from 101
       if (rows.length && rows[0].max_code) {
-        nextNum = rows[0].max_code + 1;
+        nextNum = Math.max(rows[0].max_code + 1, 101); // Ensure it's at least 101
       }
       const manager_code = `MN${String(nextNum).padStart(3, '0')}`;
       await createManager(userId, manager_name || '', contact_number || '', manager_code);
