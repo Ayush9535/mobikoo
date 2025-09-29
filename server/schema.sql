@@ -55,3 +55,12 @@ CREATE TABLE IF NOT EXISTS managers (
   manager_code VARCHAR(20) UNIQUE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+
+-- Step 1: Insert into users table
+INSERT INTO users (email, password, role)
+VALUES ('admin1@example.com', '$2a$10$Vo4paXhhBa7ftdO6/4hgq.talVo4JYtOfXcVG5/2pFgA/yCGVEbm6', 'admin');
+
+-- Step 2: Insert into admins table (linking to users.id)
+INSERT INTO admins (user_id, admin_name, admin_code)
+VALUES (LAST_INSERT_ID(), 'Mobikoo Admin', 'ADM001');
