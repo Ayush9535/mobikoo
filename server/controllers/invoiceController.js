@@ -7,13 +7,33 @@ exports.bulkUploadInvoices = async (req, res) => {
   if (!canEdit(user.role)) return res.status(403).json({ error: 'Forbidden' });
   const invoices = req.body.invoices;
   if (!Array.isArray(invoices)) return res.status(400).json({ error: 'Invalid data' });
+  
+  // Get all invoice_ids from the request
+  const requestInvoiceIds = invoices.map(inv => inv.invoice_id).filter(id => id);
+  
+  // Check for existing invoice_ids
+  const [existingInvoices] = await pool.query(
+    'SELECT invoice_id FROM invoices WHERE invoice_id IN (?)',
+    [requestInvoiceIds]
+  );
+  const existingInvoiceIds = new Set(existingInvoices.map(inv => inv.invoice_id));
+
   const fields = [
     'invoice_id', 'date', 'customer_name', 'customer_contact_number', 'customer_alt_contact_number',
     'device_model_name', 'imei_number', 'device_price', 'payment_mode', 'shop_code'
   ];
   let success = 0, failed = 0;
   let failed_ids = [];
+  let duplicate_ids = [];
+
   for (const row of invoices) {
+    // Skip if invoice_id already exists
+    if (row.invoice_id && existingInvoiceIds.has(row.invoice_id)) {
+      failed++;
+      duplicate_ids.push(row.invoice_id);
+      continue;
+    }
+
     const data = {};
     for (const f of fields) data[f] = row[f] !== undefined ? row[f] : null;
     data.created_by = user.id;
@@ -27,7 +47,13 @@ exports.bulkUploadInvoices = async (req, res) => {
       if (row.invoice_id) failed_ids.push(row.invoice_id);
     }
   }
-  res.json({ success, failed, failed_ids });
+  res.json({ 
+    success, 
+    failed, 
+    failed_ids,
+    duplicate_ids,
+    message: duplicate_ids.length > 0 ? `${duplicate_ids.length} invoices skipped due to duplicate invoice IDs` : undefined
+  });
 };
 const { createInvoice, getAllInvoices, getInvoiceById, updateInvoice, deleteInvoice } = require('../models/invoice');
 const { getUserByEmail } = require('../models/user');

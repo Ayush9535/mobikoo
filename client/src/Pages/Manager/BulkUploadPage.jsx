@@ -9,7 +9,8 @@ export default function BulkUploadPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [failedIds, setFailedIds] = useState(null);
+  const [duplicateIds, setDuplicateIds] = useState(null);
   const [reading, setReading] = useState(false);
 
   const fieldMap = {
@@ -101,29 +102,34 @@ export default function BulkUploadPage() {
     setUploading(true);
     setError('');
     setSuccess('');
-    setResult(null);
+    setFailedIds(null);
+    setDuplicateIds(null);
     try {
       const resp = await axios.post('/api/invoices/bulk', { invoices: rows }, {
         headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
-      const { success: succCount, failed: failCount, failed_ids } = resp.data || {};
-      if (succCount > 0 && failCount === 0) {
+      const { success: succCount, failed: failCount, failed_ids, duplicate_ids, message } = resp.data || {};
+      const totalFailed = (failed_ids?.length || 0) + (duplicate_ids?.length || 0);
+
+      if (succCount > 0 && totalFailed === 0) {
         setSuccess(`Bulk upload successful! (${succCount} invoices uploaded)`);
         setError('');
-      } else if (succCount > 0 && failCount > 0) {
-        setSuccess(`Partial success: ${succCount} uploaded, ${failCount} failed.`);
-        setError('Some invoices failed to upload. See details below.');
-      } else if (succCount === 0 && failCount > 0) {
+      } else if (succCount > 0 && totalFailed > 0) {
+        setSuccess(`Partial success: ${succCount} uploaded, ${totalFailed} failed.`);
+        setError('Some invoices could not be processed. See details below.');
+      } else if (succCount === 0 && totalFailed > 0) {
         setSuccess('');
         setError('Bulk upload failed. No invoices uploaded. See details below.');
       } else {
         setSuccess('');
         setError('Unexpected response from server.');
       }
-      setResult(failed_ids || []);
+      setFailedIds(failed_ids || []);
+      setDuplicateIds(duplicate_ids || []);
     } catch (err) {
       setSuccess('');
-      setResult(null);
+      setFailedIds(null);
+      setDuplicateIds(null);
       setError('Bulk upload failed. Please check your file and try again.');
     } finally {
       setUploading(false);
@@ -309,31 +315,50 @@ export default function BulkUploadPage() {
       )}
 
       {/* Failed Results */}
-      {result && result.length > 0 && (
+      {(failedIds?.length > 0 || duplicateIds?.length > 0) && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 font-poppins flex items-center">
               <AlertCircle className="w-5 h-5 mr-2 text-yellow-600" />
-              Failed Invoices
+              Upload Results
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              The following invoice IDs failed to upload
+              Summary of invoices that couldn't be processed
             </p>
           </div>
           
-          <div className="p-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex flex-wrap gap-2">
-                {result.map(id => (
-                  <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                    {id}
-                  </span>
-                ))}
+          <div className="p-6 space-y-6">
+            {duplicateIds?.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-yellow-900 mb-2">Duplicate Invoices</h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {duplicateIds.map(id => (
+                    <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                      {id}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-yellow-700">
+                  These invoice IDs already exist in the system and were skipped.
+                </p>
               </div>
-              <p className="text-sm text-red-700 mt-3">
-                Please check these invoices for errors and try uploading them again individually.
-              </p>
-            </div>
+            )}
+            
+            {failedIds?.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-red-900 mb-2">Failed Invoices</h4>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {failedIds.map(id => (
+                    <span key={id} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                      {id}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-red-700">
+                  These invoices failed to upload due to errors. Please check the data and try again.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
