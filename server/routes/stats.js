@@ -19,6 +19,14 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-router.get('/shopowner', authMiddleware, statsController.getShopOwnerStats);
+// Shop Owner routes
+router.get('/shopowner/monthly', authMiddleware, statsController.getShopOwnerMonthlyStats);
+router.get('/shopowner/yearly', authMiddleware, statsController.getShopOwnerYearlyStats);
+router.get('/shopowner/lifetime', authMiddleware, statsController.getShopOwnerLifetimeStats);
+
+// Admin routes
+router.get('/admin/monthly', authMiddleware, statsController.getAdminMonthlyStats);
+router.get('/admin/yearly', authMiddleware, statsController.getAdminYearlyStats);
+router.get('/admin/lifetime', authMiddleware, statsController.getAdminLifetimeStats);
 
 module.exports = router;

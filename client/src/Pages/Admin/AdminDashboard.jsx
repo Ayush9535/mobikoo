@@ -3,7 +3,7 @@ import { Link, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import UserManagement from './UserManagement';
 import InvoiceManagement from './InvoiceManagement';
 import axios from 'axios';
-import { BarChart3, Users, FileText, Store, User, Trophy, TrendingUp, ArrowUpRight, Shield, DollarSign } from 'lucide-react';
+import { BarChart3, Users, FileText, Store, User, Trophy, TrendingUp, ArrowUpRight, Shield, DollarSign, Smartphone } from 'lucide-react';
 const sidebarOptions = [
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3, path: '/admin-dashboard' },
   { key: 'users', label: 'Users Management', icon: Users, path: '/admin-dashboard/users' },
@@ -25,14 +25,20 @@ const formatTimeAgo = (dateString) => {
 export default function AdminDashboard() {
   const location = useLocation();
   const [adminDetails, setAdminDetails] = useState(null);
+  const [selectedDuration, setSelectedDuration] = useState('lifetime');
   const [stats, setStats] = useState({
     totalSales: 0,
     totalInvoices: 0,
-    // totalUsers: 0,
+    salesChange: 0,
+    invoicesChange: 0,
     totalManagers: 0,
     totalShopOwners: 0,
     topShop: '',
     topManager: '',
+    topSellingModel: '',
+    avgMonthlySales: 0,
+    avgMonthlyInvoices: 0,
+    firstSaleDate: null
   });
   const [loadingStats, setLoadingStats] = useState(true);
   const [recentActivities, setRecentActivities] = useState([]);
@@ -48,8 +54,8 @@ export default function AdminDashboard() {
       color: 'blue',
       bgColor: 'bg-blue-100',
       iconColor: 'text-blue-600',
-      trend: '+12%',
-      trendUp: true
+      trend: stats.salesChange ? (stats.salesChange > 0 ? `+${stats.salesChange}%` : `${stats.salesChange}%`) : '-',
+      trendUp: stats.salesChange > 0
     },
     {
       label: 'Total Invoices',
@@ -58,8 +64,8 @@ export default function AdminDashboard() {
       color: 'green',
       bgColor: 'bg-green-100',
       iconColor: 'text-green-600',
-      trend: '+8%',
-      trendUp: true
+      trend: stats.invoicesChange ? (stats.invoicesChange > 0 ? `+${stats.invoicesChange}%` : `${stats.invoicesChange}%`) : '-',
+      trendUp: stats.invoicesChange > 0
     },
     {
       label: 'Total Managers',
@@ -92,13 +98,13 @@ export default function AdminDashboard() {
       trendUp: true
     },
     {
-      label: 'Top Manager (Invoices)',
-      value: loadingStats ? '...' : stats.topManager || '-',
-      icon: TrendingUp,
-      color: 'indigo',
-      bgColor: 'bg-indigo-100',
-      iconColor: 'text-indigo-600',
-      trend: '127 invoices',
+      label: 'Top Selling Model',
+      value: loadingStats ? '...' : stats.topSellingModel || '-',
+      icon: Smartphone,
+      color: 'teal',
+      bgColor: 'bg-teal-100',
+      iconColor: 'text-teal-600',
+      trend: 'Most Popular',
       trendUp: true
     }
   ];
@@ -144,67 +150,64 @@ export default function AdminDashboard() {
     const fetchStats = async () => {
       setLoadingStats(true);
       try {
-        const [invoiceRes, shopRes, managerRes] = await Promise.all([
-          axios.get('/api/invoices', { headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` } }),
-          axios.get('/api/admin/shopowners'),
-          axios.get('/api/admin/managers'),
-          // axios.get('/api/admin/users'),
-        ]);
-        const invoices = invoiceRes.data;
-        const shopOwners = shopRes.data;
-        const managers = managerRes.data;
-        // const users = userRes.data;
-        let totalSales = 0;
-        let shopSales = {};
-        let managerInvoices = {};
-        invoices.forEach(inv => {
-          const price = parseFloat(inv.device_price) || 0;
-          totalSales += price;
-          if (inv.shop_code) shopSales[inv.shop_code] = (shopSales[inv.shop_code] || 0) + price;
-          if (inv.created_by) managerInvoices[inv.created_by] = (managerInvoices[inv.created_by] || 0) + 1;
+        const response = await axios.get(`/api/stats/admin/${selectedDuration}`, {
+          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
-        // Find top shop and top manager
-        let topShop = '';
-        let topShopSales = 0;
-        for (const code in shopSales) {
-          if (shopSales[code] > topShopSales) {
-            topShopSales = shopSales[code];
-            topShop = code;
-          }
+        
+        if (selectedDuration === 'lifetime') {
+          setStats({
+            totalSales: response.data.lifetime.totalSales,
+            totalInvoices: response.data.lifetime.totalInvoices,
+            avgMonthlySales: response.data.lifetime.avgMonthlySales,
+            avgMonthlyInvoices: response.data.lifetime.avgMonthlyInvoices,
+            firstSaleDate: response.data.lifetime.firstSaleDate,
+            totalManagers: response.data.totalManagers,
+            totalShopOwners: response.data.totalShopOwners,
+            topShop: response.data.topShop,
+            topManager: response.data.topManager,
+            topSellingModel: response.data.topSellingModel,
+            salesChange: 0,
+            invoicesChange: 0
+          });
+        } else {
+          const period = selectedDuration === 'monthly' ? 'Month' : 'Year';
+          setStats({
+            totalSales: response.data[`current${period}`].totalSales,
+            totalInvoices: response.data[`current${period}`].totalInvoices,
+            salesChange: response.data.percentageChanges.salesChange,
+            invoicesChange: response.data.percentageChanges.invoicesChange,
+            totalManagers: response.data.totalManagers,
+            totalShopOwners: response.data.totalShopOwners,
+            topShop: response.data.topShop,
+            topManager: response.data.topManager,
+            topSellingModel: response.data.topSellingModel,
+            avgMonthlySales: 0,
+            avgMonthlyInvoices: 0,
+            firstSaleDate: null
+          });
         }
-        let topManager = '';
-        let topManagerCount = 0;
-        for (const mgr in managerInvoices) {
-          if (managerInvoices[mgr] > topManagerCount) {
-            topManagerCount = managerInvoices[mgr];
-            topManager = mgr;
-          }
-        }
-        setStats({
-          totalSales,
-          totalInvoices: invoices.length,
-          // totalUsers: users.length,
-          totalManagers: managers.length,
-          totalShopOwners: shopOwners.length,
-          topShop,
-          topManager,
-        });
-      } catch {
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
         setStats({
           totalSales: 0,
           totalInvoices: 0,
-          // totalUsers: 0,
+          salesChange: 0,
+          invoicesChange: 0,
           totalManagers: 0,
           totalShopOwners: 0,
           topShop: '',
           topManager: '',
+          topSellingModel: '',
+          avgMonthlySales: 0,
+          avgMonthlyInvoices: 0,
+          firstSaleDate: null
         });
       } finally {
         setLoadingStats(false);
       }
     };
     fetchStats();
-  }, []);
+  }, [selectedDuration]);
 
   return (
     <div className="h-screen overflow-hidden bg-gray-50">
@@ -307,9 +310,23 @@ export default function AdminDashboard() {
         <main className="flex-1 p-6 overflow-y-auto">
           {currentView === 'dashboard' ? (
             <div className="space-y-6">
-              {/* Page Header */}
-              <div>
+              {/* Page Header with Duration Toggle */}
+              <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-gray-900 font-poppins">Dashboard Overview</h2>
+                <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+                  {['monthly', 'yearly', 'lifetime'].map((duration) => (
+                    <button
+                      key={duration}
+                      onClick={() => setSelectedDuration(duration)}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedDuration === duration
+                        ? 'bg-blue-100 text-blue-600'
+                        : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                    >
+                      {duration.charAt(0).toUpperCase() + duration.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Stats Cards */}

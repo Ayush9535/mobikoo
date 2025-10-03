@@ -66,3 +66,15 @@ CREATE TABLE IF NOT EXISTS invoices (
 -- ALTER TABLE for invoices (run these if table already exists)
 ALTER TABLE invoices ADD COLUMN shop_code VARCHAR(20);
 ALTER TABLE invoices ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+
+CREATE TABLE warranty_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    renewed_on DATE DEFAULT NULL,
+    renewal_notes VARCHAR(255),
+    status ENUM('Active', 'Expired') DEFAULT 'Active',
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+);

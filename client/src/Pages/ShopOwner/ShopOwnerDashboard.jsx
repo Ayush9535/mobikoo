@@ -1,8 +1,71 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { BarChart3, FileText, RefreshCw, TrendingUp, Receipt, Store } from 'lucide-react';
+import { BarChart3, Store, FileText, TrendingUp, RefreshCw, Receipt, Smartphone, Bell, AlertTriangle, User } from 'lucide-react';
 import InvoiceDetailsModal from '../../components/InvoiceDetailsModal';
+
+const NotificationsPage = ({ notifications, onInvoiceClick }) => (
+  <div className="space-y-6">
+    <div className="flex items-center justify-between">
+      <h2 className="text-2xl font-bold text-gray-900 font-poppins">Warranty Notifications</h2>
+      <p className="text-sm text-gray-600">Devices with warranty expiring in the next 30 days</p>
+    </div>
+
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="divide-y divide-gray-100">
+        {notifications.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <div className="mb-4">
+              <Bell className="w-12 h-12 text-gray-400 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No Notifications</h3>
+            <p>There are no devices with warranty expiring soon.</p>
+          </div>
+        ) : (
+          notifications.map((notification, index) => (
+            <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
+              <div className="flex items-start space-x-4">
+                <div className="p-3 bg-yellow-50 rounded-lg">
+                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        {notification.device_model_name}
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Invoice #
+                        <a
+                          href="#"
+                          className="text-blue-600 hover:underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onInvoiceClick(notification);
+                          }}
+                        >
+                          {notification.invoice_id}
+                        </a>
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 text-sm font-medium text-yellow-800 bg-yellow-100 rounded-full">
+                      Expires {new Date(notification.end_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center text-sm text-gray-500">
+                    <User className="w-4 h-4 mr-1" />
+                    {notification.customer_name}
+                  </div>
+                  
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  </div>
+);
 
 const InvoiceTable = ({ invoices, onInvoiceClick, isRecent = false }) => (
   <div className="overflow-x-auto">
@@ -39,6 +102,7 @@ const InvoiceTable = ({ invoices, onInvoiceClick, isRecent = false }) => (
 
 export default function ShopOwnerDashboard() {
   const { userInfo } = useAuth();
+  const [loadingStats, setLoadingStats] = useState(true);
   const [shopDetails, setShopDetails] = useState(null);
   const [sidebarTab, setSidebarTab] = useState('dashboard');
   const [recentInvoices, setRecentInvoices] = useState([]);
@@ -47,11 +111,31 @@ export default function ShopOwnerDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [loadingAll, setLoadingAll] = useState(true);
+  const [selectedDuration, setSelectedDuration] = useState('monthly');
+    const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Click outside handler for notifications dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications && !event.target.closest('.notifications-container')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifications]);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalInvoices: 0,
     salesChange: 0,
-    invoicesChange: 0
+    invoicesChange: 0,
+    topSellingModel: '',
+    avgMonthlySales: 0,
+    avgMonthlyInvoices: 0,
+    firstSaleDate: null
   });
 
   useEffect(() => {
@@ -86,24 +170,53 @@ export default function ShopOwnerDashboard() {
 
   const fetchStats = async () => {
     if (!shopDetails) return;
+    setLoadingStats(true);
     try {
-      const res = await axios.get(`/api/stats/shopowner?shop_code=${shopDetails.shop_code}`, {
+      const res = await axios.get(`/api/stats/shopowner/${selectedDuration}`, {
+        params: { shop_code: shopDetails.shop_code },
         headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
-      setStats({
-        totalSales: res.data.currentMonth.totalSales,
-        totalInvoices: res.data.currentMonth.totalInvoices,
-        salesChange: res.data.percentageChanges.salesChange,
-        invoicesChange: res.data.percentageChanges.invoicesChange
-      });
+
+      if (selectedDuration === 'lifetime') {
+        // Handle lifetime stats
+        setStats({
+          totalSales: res.data.lifetime.totalSales,
+          totalInvoices: res.data.lifetime.totalInvoices,
+          avgMonthlySales: res.data.lifetime.avgMonthlySales,
+          avgMonthlyInvoices: res.data.lifetime.avgMonthlyInvoices,
+          firstSaleDate: res.data.lifetime.firstSaleDate,
+          topSellingModel: res.data.topSellingModel,
+          salesChange: 0,
+          invoicesChange: 0
+        });
+      } else {
+        // Handle monthly/yearly stats
+        const period = selectedDuration === 'monthly' ? 'Month' : 'Year';
+        setStats({
+          totalSales: res.data[`current${period}`].totalSales,
+          totalInvoices: res.data[`current${period}`].totalInvoices,
+          salesChange: res.data.percentageChanges.salesChange,
+          invoicesChange: res.data.percentageChanges.invoicesChange,
+          topSellingModel: res.data.topSellingModel,
+          avgMonthlySales: 0,
+          avgMonthlyInvoices: 0,
+          firstSaleDate: null
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch stats:', error);
       setStats({
         totalSales: 0,
         totalInvoices: 0,
         salesChange: 0,
-        invoicesChange: 0
+        invoicesChange: 0,
+        topSellingModel: '',
+        avgMonthlySales: 0,
+        avgMonthlyInvoices: 0,
+        firstSaleDate: null
       });
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -122,6 +235,22 @@ export default function ShopOwnerDashboard() {
     }
   };
 
+  const fetchWarrantyNotifications = async () => {
+    if (!shopDetails) return;
+    try {
+      const response = await axios.get('/api/warranty/notifications', {
+        params: { shop_code: shopDetails.shop_code },
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
+      });
+      setNotifications(response.data.notifications);
+      setNotificationCount(response.data.count);
+    } catch (error) {
+      console.error('Failed to fetch warranty notifications:', error);
+      setNotifications([]);
+      setNotificationCount(0);
+    }
+  };
+
   useEffect(() => {
     if (!shopDetails) return;
     
@@ -130,8 +259,13 @@ export default function ShopOwnerDashboard() {
       fetchStats();
     }
     fetchAllInvoices();
+    fetchWarrantyNotifications();
+    
+    // Set up polling for notifications every 5 minutes
+    const notificationInterval = setInterval(fetchWarrantyNotifications, 300000);
+    return () => clearInterval(notificationInterval);
     // eslint-disable-next-line
-  }, [sidebarTab, shopDetails]);
+  }, [sidebarTab, shopDetails, selectedDuration]);
 
   return (
     <div className="h-screen overflow-hidden bg-gray-50">
@@ -155,16 +289,20 @@ export default function ShopOwnerDashboard() {
         <aside className="w-64 bg-white shadow-sm border-r border-gray-200 flex-shrink-0 flex flex-col">
           {/* Shop Info Header */}
           <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-blue-50 to-white">
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                <Store className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                  <Store className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 font-poppins text-sm leading-tight">
+                    {shopDetails?.shop_name || 'Loading...'}
+                  </h3>
+                  <p className="text-xs text-blue-600 font-medium">{shopDetails?.shop_code || 'Loading...'}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 font-poppins text-sm leading-tight">
-                  {shopDetails?.shop_name || 'Loading...'}
-                </h3>
-                <p className="text-xs text-blue-600 font-medium">{shopDetails?.shop_code || 'Loading...'}</p>
-              </div>
+              
+              
             </div>
             <p className="text-xs text-gray-600 leading-relaxed">{shopDetails?.shop_address || 'Loading...'}</p>
           </div>
@@ -195,6 +333,25 @@ export default function ShopOwnerDashboard() {
                 <FileText className="w-4 h-4 mr-3" />
                 All Invoices
               </button>
+
+              <button
+                onClick={() => setSidebarTab('notifications')}
+                className={`w-full flex justify-between items-center px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
+                  sidebarTab === 'notifications'
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                }`}
+              >
+                <div className='flex items-center justify-center'>
+                  <Bell className="w-4 h-4 mr-3" />
+                <span className="flex-1">Notifications</span>
+                </div>
+                {notificationCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+                    {notificationCount}
+                  </span>
+                )}
+              </button>
             </div>
           </nav>
           
@@ -223,29 +380,69 @@ export default function ShopOwnerDashboard() {
             <div className="space-y-6">
               {/* Page Header */}
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 font-poppins">Dashboard</h2>
-                <p className="text-gray-600 mt-1">Overview of your shop's performance</p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 font-poppins">Dashboard</h2>
+                    <p className="text-gray-600 mt-1">Overview of your shop's performance</p>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                    {[
+                      { id: 'monthly', label: 'This Month' },
+                      { id: 'yearly', label: 'This Year' },
+                      { id: 'lifetime', label: 'All Time' }
+                    ].map(duration => (
+                      <button
+                        key={duration.id}
+                        onClick={() => setSelectedDuration(duration.id)}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          selectedDuration === duration.id
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {duration.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (Current Month)</p>
-                      <p className="text-2xl font-bold text-gray-900">₹{stats.totalSales.toLocaleString()}</p>
+                      <p className="text-sm font-medium text-gray-500 mb-1">
+                        Total Sales {selectedDuration === 'lifetime' ? '' : selectedDuration === 'yearly' ? '(This Year)' : '(This Month)'}
+                      </p>
+                      {loadingStats ? (
+                        <div className="animate-pulse bg-gray-200 h-8 w-32 rounded mt-1"></div>
+                      ) : (
+                        <p className="text-2xl font-bold text-gray-900">₹{stats.totalSales.toLocaleString()}</p>
+                      )}
                     </div>
                     <div className="p-3 bg-green-100 rounded-lg">
                       <TrendingUp className="w-6 h-6 text-green-600" />
                     </div>
                   </div>
                   <div className="mt-4 flex items-center">
-                    {stats.salesChange !== 0 && (
+                    {loadingStats ? (
+                      <div className="animate-pulse bg-gray-200 h-4 w-24 rounded"></div>
+                    ) : selectedDuration === 'lifetime' ? (
+                      <>
+                        <span className="text-xs font-medium text-green-600">
+                          Avg ₹{stats.avgMonthlySales.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">per month</span>
+                      </>
+                    ) : stats.salesChange !== 0 && (
                       <>
                         <span className={`text-xs font-medium ${stats.salesChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {stats.salesChange >= 0 ? '↑' : '↓'} {Math.abs(stats.salesChange)}%
                         </span>
-                        <span className="text-xs text-gray-500 ml-2">vs last month</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          vs last {selectedDuration === 'yearly' ? 'year' : 'month'}
+                        </span>
                       </>
                     )}
                   </div>
@@ -254,25 +451,105 @@ export default function ShopOwnerDashboard() {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-500 mb-1">Total Invoices (Current Month)</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalInvoices}</p>
+                      <p className="text-sm font-medium text-gray-500 mb-1">
+                        Total Invoices {selectedDuration === 'lifetime' ? '' : selectedDuration === 'yearly' ? '(This Year)' : '(This Month)'}
+                      </p>
+                      {loadingStats ? (
+                        <div className="animate-pulse bg-gray-200 h-8 w-24 rounded mt-1"></div>
+                      ) : (
+                        <p className="text-2xl font-bold text-gray-900">{stats.totalInvoices}</p>
+                      )}
                     </div>
                     <div className="p-3 bg-blue-100 rounded-lg">
                       <Receipt className="w-6 h-6 text-blue-600" />
                     </div>
                   </div>
                   <div className="mt-4 flex items-center">
-                    {stats.invoicesChange !== 0 && (
+                    {loadingStats ? (
+                      <div className="animate-pulse bg-gray-200 h-4 w-24 rounded"></div>
+                    ) : selectedDuration === 'lifetime' ? (
+                      <>
+                        <span className="text-xs font-medium text-blue-600">
+                          Avg {stats.avgMonthlyInvoices}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">per month</span>
+                      </>
+                    ) : stats.invoicesChange !== 0 && (
                       <>
                         <span className={`text-xs font-medium ${stats.invoicesChange >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                           {stats.invoicesChange >= 0 ? '↑' : '↓'} {Math.abs(stats.invoicesChange)}%
                         </span>
-                        <span className="text-xs text-gray-500 ml-2">vs last month</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          vs last {selectedDuration === 'yearly' ? 'year' : 'month'}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">
+                        Top Selling Model {selectedDuration === 'lifetime' ? '(All Time)' : selectedDuration === 'yearly' ? '(This Year)' : '(This Month)'}
+                      </p>
+                      {loadingStats ? (
+                        <div className="animate-pulse bg-gray-200 h-8 w-40 rounded mt-1"></div>
+                      ) : (
+                        <p className="text-2xl font-bold text-gray-900">{stats.topSellingModel || '-'}</p>
+                      )}
+                    </div>
+                    <div className="p-3 bg-teal-100 rounded-lg">
+                      <Smartphone className="w-6 h-6 text-teal-600" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center">
+                    {loadingStats ? (
+                      <div className="animate-pulse bg-gray-200 h-4 w-24 rounded"></div>
+                    ) : (
+                      <>
+                        <span className="text-xs font-medium text-teal-600">Most Popular</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          {selectedDuration === 'lifetime' ? 'model' : selectedDuration === 'yearly' ? 'this year' : 'this month'}
+                        </span>
                       </>
                     )}
                   </div>
                 </div>
               </div>
+
+              {/* Notification Card */}
+              {notificationCount > 0 && (
+                <div className="bg-yellow-100 rounded-lg shadow-sm border border-yellow-200 p-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 bg-yellow-50 rounded-lg">
+                      <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 font-poppins">
+                            Warranty Notifications
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            You have <span className="font-medium text-red-600">{notificationCount}</span> devices with warranty expiring soon
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setSidebarTab('notifications')}
+                          className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors"
+                        >
+                          View All
+                          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Recent Invoices Section */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -304,6 +581,11 @@ export default function ShopOwnerDashboard() {
                 </div>
               </div>
             </div>
+          ) : sidebarTab === 'notifications' ? (
+            <NotificationsPage 
+              notifications={notifications}
+              onInvoiceClick={setSelectedInvoice}
+            />
           ) : (
             <div className="space-y-6">
               {/* All Invoices Header */}

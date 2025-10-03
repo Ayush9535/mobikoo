@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
+const { createWarrantyHistory } = require('../models/warranty');
 
 // Validation helper function
 function validateInvoiceData(data) {
@@ -118,6 +119,7 @@ exports.bulkUploadInvoices = async (req, res) => {
 
     try {
       await createInvoice(data);
+      await createWarrantyHistory(id, data.date, data.warranty_duration);
       success++;
     } catch (error) {
       failed++;
@@ -164,49 +166,40 @@ exports.createInvoice = async (req, res) => {
   if (!canEdit(user.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const data = req.body;
-    
-    // First verify if the shop_code exists
+
     if (!data.shop_code) {
-      return res.status(400).json({ 
-        error: 'Invalid shop', 
-        message: 'Shop code is required'
-      });
+      return res.status(400).json({ error: 'Invalid shop', message: 'Shop code is required' });
     }
 
-    // Verify shop exists
     const [shopExists] = await pool.query(
       'SELECT shop_code FROM shop_owners WHERE shop_code = ?',
       [data.shop_code]
     );
 
     if (!shopExists || shopExists.length === 0) {
-      return res.status(400).json({ 
-        error: 'Invalid shop', 
-        message: `Shop with code ${data.shop_code} does not exist`
-      });
+      return res.status(400).json({ error: 'Invalid shop', message: `Shop with code ${data.shop_code} does not exist` });
     }
-    
-    // Check if invoice_id already exists for this shop
+
     if (data.invoice_id && data.shop_code) {
       const [existing] = await pool.query(
         'SELECT invoice_id FROM invoices WHERE invoice_id = ? AND shop_code = ?',
         [data.invoice_id, data.shop_code]
       );
-      
+
       if (existing && existing.length > 0) {
-        return res.status(400).json({ 
-          error: 'Duplicate invoice', 
-          message: `An invoice with ID ${data.invoice_id} already exists for shop ${data.shop_code}`,
-          isDuplicate: true
-        });
+        return res.status(400).json({ error: 'Duplicate invoice', message: `An invoice with ID ${data.invoice_id} already exists for shop ${data.shop_code}`, isDuplicate: true });
       }
     }
 
     data.created_by = user.id;
     data.warranty_duration = '2 years';
     if (!data.created_at) data.created_at = new Date();
-    
+
     const id = await createInvoice(data);
+
+    // **Add warranty history entry**
+    await createWarrantyHistory(id, data.date, data.warranty_duration);
+
     res.json({ id, invoice_id: data.invoice_id });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create invoice', details: err.message });
