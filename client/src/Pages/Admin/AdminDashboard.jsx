@@ -2,13 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Link, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import UserManagement from './UserManagement';
 import InvoiceManagement from './InvoiceManagement';
+import WarrantyManagement from './WarrantyManagement';
+import WarrantyNotifications from './WarrantyNotifications';
 import axios from 'axios';
-import { BarChart3, Users, FileText, Store, User, Trophy, TrendingUp, ArrowUpRight, Shield, DollarSign, Smartphone } from 'lucide-react';
-const sidebarOptions = [
-  { key: 'dashboard', label: 'Dashboard', icon: BarChart3, path: '/admin-dashboard' },
-  { key: 'users', label: 'Users Management', icon: Users, path: '/admin-dashboard/users' },
-  { key: 'invoices', label: 'Invoice Management', icon: FileText, path: '/admin-dashboard/invoices' },
-];
+import { BarChart3, Users, FileText, DollarSign, Trophy, Smartphone, Bell, AlertTriangle, ChevronRight, Shield, CheckCircle } from 'lucide-react';
+import AnalyticsGraphs from '../../components/AnalyticsGraphs';
 
 const formatTimeAgo = (dateString) => {
   const date = new Date(dateString);
@@ -26,14 +24,17 @@ export default function AdminDashboard() {
   const location = useLocation();
   const [adminDetails, setAdminDetails] = useState(null);
   const [selectedDuration, setSelectedDuration] = useState('lifetime');
+  const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [stats, setStats] = useState({
     totalSales: 0,
     totalInvoices: 0,
     salesChange: 0,
     invoicesChange: 0,
-    totalManagers: 0,
-    totalShopOwners: 0,
-    topShop: '',
+    warranties: {
+      totalExtendedWarranties: 0,
+      totalActiveWarranties: 0
+    },
     topManager: '',
     topSellingModel: '',
     avgMonthlySales: 0,
@@ -45,6 +46,40 @@ export default function AdminDashboard() {
   const [loadingActivities, setLoadingActivities] = useState(true);
 
   const [currentView, setCurrentView] = useState('dashboard');
+
+  const sidebarOptions = React.useMemo(() => [
+    { key: 'dashboard', label: 'Dashboard', icon: BarChart3, path: '/admin-dashboard' },
+    { key: 'users', label: 'Users Management', icon: Users, path: '/admin-dashboard/users' },
+    { key: 'invoices', label: 'Invoice Management', icon: FileText, path: '/admin-dashboard/invoices' },
+    { key: 'warranty-management', label: 'Warranty Management', icon: Shield, path: '/admin-dashboard/warranties' },
+    { 
+      key: 'warranty', 
+      label: (
+        <div className='flex items-center justify-between w-full'>
+          <span>Warranty Notifications</span>
+          {notificationCount > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 text-xs font-medium bg-red-500 text-white rounded-full">
+              {notificationCount}
+            </span>
+          )}
+        </div>
+      ), 
+      icon: Bell, 
+      path: '/admin-dashboard/warranty' 
+    },
+  ], [notificationCount]);
+
+  const fetchWarrantyNotifications = async () => {
+    try {
+      const response = await axios.get('/api/warranty/admin/notifications', {
+        headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
+      });
+      setNotifications(response.data.all_notifications.slice(0, 3));
+      setNotificationCount(response.data.total_count);
+    } catch (error) {
+      console.error('Failed to fetch warranty notifications:', error);
+    }
+  };
 
   const statCards = [
     {
@@ -68,33 +103,33 @@ export default function AdminDashboard() {
       trendUp: stats.invoicesChange > 0
     },
     {
-      label: 'Total Managers',
-      value: loadingStats ? '...' : stats.totalManagers,
-      icon: User,
+      label: 'Extended Warranties',
+      value: loadingStats ? '...' : stats.warranties?.totalExtendedWarranties || 0,
+      icon: Shield,
       color: 'purple',
       bgColor: 'bg-purple-100',
       iconColor: 'text-purple-600',
-      trend: '+2',
+      trend: 'Total Renewed',
       trendUp: true
     },
     {
-      label: 'Total Shop Owners',
-      value: loadingStats ? '...' : stats.totalShopOwners,
-      icon: Store,
+      label: 'Active Warranties',
+      value: loadingStats ? '...' : stats.warranties?.totalActiveWarranties || 0,
+      icon: CheckCircle,
       color: 'orange',
       bgColor: 'bg-orange-100',
       iconColor: 'text-orange-600',
-      trend: '+5',
+      trend: 'Currently Valid',
       trendUp: true
     },
     {
-      label: 'Top Shop (Sales)',
-      value: loadingStats ? '...' : stats.topShop || '-',
+      label: 'Top Manager',
+      value: loadingStats ? '...' : stats.topManager || '-',
       icon: Trophy,
       color: 'yellow',
       bgColor: 'bg-yellow-100',
       iconColor: 'text-yellow-600',
-      trend: 'Leading',
+      trend: 'Most Sales',
       trendUp: true
     },
     {
@@ -125,8 +160,23 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    // Update currentView based on location
+    const path = location.pathname;
+    if (path.includes('/users')) {
+      setCurrentView('users');
+    } else if (path.includes('/invoices')) {
+      setCurrentView('invoices');
+    } else if (path.includes('/warranty')) {
+      setCurrentView('warranty');
+    } else {
+      setCurrentView('dashboard');
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (currentView === 'dashboard') {
       fetchRecentActivities();
+      fetchWarrantyNotifications();
     }
   }, [currentView]);
 
@@ -161,9 +211,7 @@ export default function AdminDashboard() {
             avgMonthlySales: response.data.lifetime.avgMonthlySales,
             avgMonthlyInvoices: response.data.lifetime.avgMonthlyInvoices,
             firstSaleDate: response.data.lifetime.firstSaleDate,
-            totalManagers: response.data.totalManagers,
-            totalShopOwners: response.data.totalShopOwners,
-            topShop: response.data.topShop,
+            warranties: response.data.warranties,
             topManager: response.data.topManager,
             topSellingModel: response.data.topSellingModel,
             salesChange: 0,
@@ -176,9 +224,7 @@ export default function AdminDashboard() {
             totalInvoices: response.data[`current${period}`].totalInvoices,
             salesChange: response.data.percentageChanges.salesChange,
             invoicesChange: response.data.percentageChanges.invoicesChange,
-            totalManagers: response.data.totalManagers,
-            totalShopOwners: response.data.totalShopOwners,
-            topShop: response.data.topShop,
+            warranties: response.data.warranties,
             topManager: response.data.topManager,
             topSellingModel: response.data.topSellingModel,
             avgMonthlySales: 0,
@@ -193,9 +239,10 @@ export default function AdminDashboard() {
           totalInvoices: 0,
           salesChange: 0,
           invoicesChange: 0,
-          totalManagers: 0,
-          totalShopOwners: 0,
-          topShop: '',
+          warranties: {
+            totalExtendedWarranties: 0,
+            totalActiveWarranties: 0
+          },
           topManager: '',
           topSellingModel: '',
           avgMonthlySales: 0,
@@ -208,6 +255,38 @@ export default function AdminDashboard() {
     };
     fetchStats();
   }, [selectedDuration]);
+
+  const NotificationAlertBox = () => (
+    <div className="bg-yellow-100 rounded-lg shadow-sm border border-yellow-200 p-6">
+      <div className="flex items-start space-x-4">
+        <div className="p-3 bg-yellow-50 rounded-lg">
+          <AlertTriangle className="w-6 h-6 text-yellow-600" />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 font-poppins">
+                Warranty Notifications
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                You have <span className="font-medium text-red-600">{notificationCount}</span> warranty notifications that need attention
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setCurrentView('warranty');
+                window.history.pushState(null, '', '/admin-dashboard/warranty');
+              }}
+              className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors"
+            >
+              View All
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="h-screen overflow-hidden bg-gray-50">
@@ -272,7 +351,10 @@ export default function AdminDashboard() {
                 return (
                   <button
                     key={option.key}
-                    onClick={() => setCurrentView(option.key)}
+                    onClick={() => {
+                      setCurrentView(option.key);
+                      window.history.pushState(null, '', option.path);
+                    }}
                     className={`w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600'
@@ -365,6 +447,11 @@ export default function AdminDashboard() {
                 })}
               </div>
 
+                {notificationCount > 0 && <NotificationAlertBox />}
+
+              {/* Analytics Graphs */}
+              <AnalyticsGraphs userRole="admin" duration={selectedDuration} />
+
               {/* Recent Activity Section */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -419,6 +506,10 @@ export default function AdminDashboard() {
             </div>
           ) : currentView === 'users' ? (
             <UserManagement />
+          ) : currentView === 'warranty' ? (
+            <WarrantyNotifications notifications={notifications} />
+          ) : currentView === 'warranty-management' ? (
+            <WarrantyManagement />
           ) : (
             <InvoiceManagement />
           )}

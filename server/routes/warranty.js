@@ -19,6 +19,15 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// Notification routes
 router.get('/notifications', authMiddleware, warrantyController.getWarrantyAlerts);
+router.get('/admin/notifications', authMiddleware, warrantyController.getAdminWarrantyAlerts);
+
+// Warranty listing routes
+router.get('/shop/warranties', authMiddleware, warrantyController.getShopWarranties);
+router.get('/admin', authMiddleware, warrantyController.getAdminWarranties);
+
+// Warranty detail route
+router.get('/:id', authMiddleware, warrantyController.getWarrantyDetails);
 
 module.exports = router;

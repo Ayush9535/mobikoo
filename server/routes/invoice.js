@@ -91,6 +91,7 @@ router.get('/recent', async (req, res) => {
 router.post('/', invoiceController.createInvoice); // manager only
 router.get('/', invoiceController.getAllInvoices); // all roles
 router.get('/:id', invoiceController.getInvoiceById); // all roles
+router.get('/getByInvoiceId/:invoice_id/:shop_code', invoiceController.getInvoiceByInvoiceId); // all roles
 router.put('/:id', invoiceController.updateInvoice); // manager only
 router.delete('/:id', invoiceController.deleteInvoice); // manager only
 

@@ -12,11 +12,13 @@ app.use(express.json());
 const authRoutes = require('./routes/auth');
 const invoiceRoutes = require('./routes/invoice');
 const statsRoutes = require('./routes/stats');
+const analyticsRoutes = require('./routes/analytics');
 const warrantyRoutes = require('./routes/warranty');
 app.use('/api', authRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/stats', statsRoutes);
 app.use("/api/warranty", warrantyRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running');

@@ -79,6 +79,16 @@ exports.bulkUploadInvoices = async (req, res) => {
   // Create a Set of invoice_id-shop_code combinations
   const existingCombos = new Set(existingInvoices.map(inv => `${inv.invoice_id}-${inv.shop_code}`));
 
+  // Check for duplicate IMEI numbers
+  const imeiNumbers = invoices.filter(inv => inv.imei_number).map(inv => inv.imei_number);
+  if (imeiNumbers.length > 0) {
+    const [existingImeis] = await pool.query(
+      'SELECT imei_number, invoice_id, shop_code FROM invoices WHERE imei_number IN (?)',
+      [imeiNumbers]
+    );
+    const existingImeiMap = new Map(existingImeis.map(inv => [inv.imei_number, { invoice_id: inv.invoice_id, shop_code: inv.shop_code }]));
+  }
+
   const fields = [
     'invoice_id', 'date', 'customer_name', 'customer_contact_number', 'customer_alt_contact_number',
     'device_model_name', 'imei_number', 'device_price', 'payment_mode', 'shop_code'
@@ -86,6 +96,7 @@ exports.bulkUploadInvoices = async (req, res) => {
   let success = 0, failed = 0;
   let failed_ids = [];
   let duplicate_ids = [];
+  let duplicate_imeis = [];
   let validation_errors = [];  // Track validation errors per invoice
 
   for (const row of invoices) {
@@ -93,6 +104,14 @@ exports.bulkUploadInvoices = async (req, res) => {
     if (row.invoice_id && row.shop_code && existingCombos.has(`${row.invoice_id}-${row.shop_code}`)) {
       failed++;
       duplicate_ids.push(`${row.invoice_id} (Shop: ${row.shop_code})`);
+      continue;
+    }
+
+    // Skip if IMEI number already exists
+    if (row.imei_number && existingImeiMap.has(row.imei_number)) {
+      const existing = existingImeiMap.get(row.imei_number);
+      failed++;
+      duplicate_imeis.push(`IMEI ${row.imei_number} already registered with invoice ${existing.invoice_id} (Shop: ${existing.shop_code})`);
       continue;
     }
 
@@ -139,11 +158,16 @@ exports.bulkUploadInvoices = async (req, res) => {
     message.push(`${validation_errors.length} invoices failed validation`);
   }
 
+  if (duplicate_imeis.length > 0) {
+    message.push(`${duplicate_imeis.length} invoices skipped due to duplicate IMEI numbers`);
+  }
+
   res.json({ 
     success, 
     failed, 
     failed_ids,
     duplicate_ids,
+    duplicate_imeis,
     validation_errors,
     message: message.length > 0 ? message.join('. ') : undefined
   });
@@ -188,6 +212,22 @@ exports.createInvoice = async (req, res) => {
 
       if (existing && existing.length > 0) {
         return res.status(400).json({ error: 'Duplicate invoice', message: `An invoice with ID ${data.invoice_id} already exists for shop ${data.shop_code}`, isDuplicate: true });
+      }
+    }
+
+    // Check for duplicate IMEI
+    if (data.imei_number) {
+      const [existingImei] = await pool.query(
+        'SELECT invoice_id, shop_code FROM invoices WHERE imei_number = ?',
+        [data.imei_number]
+      );
+
+      if (existingImei && existingImei.length > 0) {
+        return res.status(400).json({ 
+          error: 'Duplicate IMEI', 
+          message: `A device with IMEI ${data.imei_number} is already registered with invoice ${existingImei[0].invoice_id} (Shop: ${existingImei[0].shop_code})`,
+          isDuplicateImei: true 
+        });
       }
     }
 
@@ -290,5 +330,26 @@ exports.deleteInvoice = async (req, res) => {
     res.json({ message: 'Invoice deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete invoice', details: err.message });
+  }
+};
+
+exports.getInvoiceByInvoiceId = async (req, res) => {
+  const user = req.user;
+  if (!canRead(user.role)) return res.status(403).json({ error: 'Forbidden' });
+  const { invoice_id, shop_code } = req.params;
+  try {
+    const [rows] = await pool.query(
+      `SELECT i.*, s.shop_name 
+       FROM invoices i
+       LEFT JOIN shop_owners s ON i.shop_code = s.shop_code
+       WHERE i.invoice_id = ? AND i.shop_code = ?`,
+      [invoice_id, shop_code]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch invoice', details: err.message });
   }
 };

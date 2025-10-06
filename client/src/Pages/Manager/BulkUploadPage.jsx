@@ -11,6 +11,7 @@ export default function BulkUploadPage() {
   const [uploading, setUploading] = useState(false);
   const [failedIds, setFailedIds] = useState(null);
   const [duplicateIds, setDuplicateIds] = useState(null);
+  const [duplicateImeis, setDuplicateImeis] = useState(null);
   const [reading, setReading] = useState(false);
   const [invalidShopCodes, setInvalidShopCodes] = useState(null);
 
@@ -107,13 +108,14 @@ export default function BulkUploadPage() {
     setSuccess('');
     setFailedIds(null);
     setDuplicateIds(null);
+    setDuplicateImeis(null);
     setValidationErrors({});
     setInvalidShopCodes(null);
     try {
       const resp = await axios.post('/api/invoices/bulk', { invoices: rows }, {
         headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
       });
-      const { success: succCount, failed: failCount, failed_ids, duplicate_ids, validation_errors, message } = resp.data || {};
+      const { success: succCount, failed: failCount, failed_ids, duplicate_ids, duplicate_imeis, validation_errors, message } = resp.data || {};
 
       // Process validation errors first
       if (validation_errors) {
@@ -137,7 +139,7 @@ export default function BulkUploadPage() {
       }
 
       // Handle other cases
-      const totalFailed = (failed_ids?.length || 0) + (duplicate_ids?.length || 0);
+      const totalFailed = (failed_ids?.length || 0) + (duplicate_ids?.length || 0) + (duplicate_imeis?.length || 0);
       if (succCount > 0 && totalFailed === 0) {
         setSuccess(`Bulk upload successful! (${succCount} invoices uploaded)`);
         setError('');
@@ -153,10 +155,12 @@ export default function BulkUploadPage() {
       }
       setFailedIds(failed_ids || []);
       setDuplicateIds(duplicate_ids || []);
+      setDuplicateImeis(duplicate_imeis || []);
     } catch (err) {
       setSuccess('');
       setFailedIds(null);
       setDuplicateIds(null);
+      setDuplicateImeis(null);
       setValidationErrors({});
       if (err.response?.data?.error === 'Invalid shops') {
         setError('Some shop codes are invalid. Please correct them and try again.');
@@ -284,7 +288,7 @@ export default function BulkUploadPage() {
       )}
 
       {/* Failed Results */}
-      {(failedIds?.length > 0 || duplicateIds?.length > 0 || invalidShopCodes?.length > 0) && (
+      {(failedIds?.length > 0 || duplicateIds?.length > 0 || duplicateImeis?.length > 0 || invalidShopCodes?.length > 0) && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 font-poppins flex items-center">
@@ -325,6 +329,22 @@ export default function BulkUploadPage() {
                 </div>
                 <p className="text-sm text-yellow-700">
                   These invoice IDs already exist in the system and were skipped.
+                </p>
+              </div>
+            )}
+            
+            {duplicateImeis?.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-yellow-900 mb-2">Duplicate IMEI Numbers</h4>
+                <div className="space-y-2">
+                  {duplicateImeis.map((imei, index) => (
+                    <div key={index} className="text-sm text-yellow-800 bg-yellow-100 p-3 rounded-lg">
+                      {imei}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-yellow-700 mt-3">
+                  These IMEI numbers are already registered in the system and were skipped.
                 </p>
               </div>
             )}

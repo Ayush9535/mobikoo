@@ -227,12 +227,12 @@ exports.getAdminMonthlyStats = async (req, res) => {
             WHERE LEFT(date, 7) = DATE_FORMAT(NOW(), '%Y-%m')`
         );
 
-        // Get user counts
-        const userStats = await pool.query(
+        // Get warranty counts
+        const warrantyStats = await pool.query(
             `SELECT 
-                SUM(CASE WHEN role = 'manager' THEN 1 ELSE 0 END) as total_managers,
-                SUM(CASE WHEN role = 'shop_owner' THEN 1 ELSE 0 END) as total_shop_owners
-            FROM users`
+                SUM(CASE WHEN renewed_on IS NOT NULL THEN 1 ELSE 0 END) as total_extended_warranties,
+                SUM(CASE WHEN status = 'Active' AND end_date > CURDATE() THEN 1 ELSE 0 END) as total_active_warranties
+            FROM warranty_history`
         );
 
         // Get top selling model for current month
@@ -244,18 +244,6 @@ exports.getAdminMonthlyStats = async (req, res) => {
             WHERE LEFT(date, 7) = DATE_FORMAT(NOW(), '%Y-%m')
             GROUP BY device_model_name
             ORDER BY sales_count DESC
-            LIMIT 1`
-        );
-
-        // Get top performing shop for current month
-        const topShop = await pool.query(
-            `SELECT 
-                shop_code,
-                SUM(CAST(device_price AS DECIMAL(10,2))) as total_sales
-            FROM invoices 
-            WHERE LEFT(date, 7) = DATE_FORMAT(NOW(), '%Y-%m')
-            GROUP BY shop_code
-            ORDER BY total_sales DESC
             LIMIT 1`
         );
 
@@ -282,7 +270,7 @@ exports.getAdminMonthlyStats = async (req, res) => {
 
         const currentMonth = currentMonthStats[0][0];
         const previousMonth = previousMonthStats[0][0];
-        const users = userStats[0][0];
+        const warranties = warrantyStats[0][0];
 
         const salesPercentChange = previousMonth.total_sales > 0 
             ? ((currentMonth.total_sales - previousMonth.total_sales) / previousMonth.total_sales) * 100
@@ -329,12 +317,12 @@ exports.getAdminYearlyStats = async (req, res) => {
             WHERE YEAR(date) = YEAR(CURRENT_DATE())`
         );
 
-        // Get user counts
-        const userStats = await pool.query(
+        // Get warranty counts for the year
+        const warrantyStats = await pool.query(
             `SELECT 
-                SUM(CASE WHEN role = 'manager' THEN 1 ELSE 0 END) as total_managers,
-                SUM(CASE WHEN role = 'shop_owner' THEN 1 ELSE 0 END) as total_shop_owners
-            FROM users`
+                SUM(CASE WHEN renewed_on IS NOT NULL AND YEAR(renewed_on) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as total_extended_warranties,
+                SUM(CASE WHEN status = 'Active' AND end_date > CURDATE() THEN 1 ELSE 0 END) as total_active_warranties
+            FROM warranty_history`
         );
 
         // Get top selling model for current year
@@ -346,18 +334,6 @@ exports.getAdminYearlyStats = async (req, res) => {
             WHERE YEAR(date) = YEAR(CURRENT_DATE())
             GROUP BY device_model_name
             ORDER BY sales_count DESC
-            LIMIT 1`
-        );
-
-        // Get top performing shop for current year
-        const topShop = await pool.query(
-            `SELECT 
-                shop_code,
-                SUM(CAST(device_price AS DECIMAL(10,2))) as total_sales
-            FROM invoices 
-            WHERE YEAR(date) = YEAR(CURRENT_DATE())
-            GROUP BY shop_code
-            ORDER BY total_sales DESC
             LIMIT 1`
         );
 
@@ -384,7 +360,7 @@ exports.getAdminYearlyStats = async (req, res) => {
 
         const currentYear = currentYearStats[0][0];
         const previousYear = previousYearStats[0][0];
-        const users = userStats[0][0];
+        const warranties = warrantyStats[0][0];
 
         const salesPercentChange = previousYear.total_sales > 0 
             ? ((currentYear.total_sales - previousYear.total_sales) / previousYear.total_sales) * 100
@@ -407,9 +383,10 @@ exports.getAdminYearlyStats = async (req, res) => {
                 salesChange: Math.round(salesPercentChange * 10) / 10,
                 invoicesChange: Math.round(invoicesPercentChange * 10) / 10
             },
-            totalManagers: users.total_managers || 0,
-            totalShopOwners: users.total_shop_owners || 0,
-            topShop: topShop[0][0]?.shop_code || '-',
+            warranties: {
+                totalExtendedWarranties: warranties.total_extended_warranties || 0,
+                totalActiveWarranties: warranties.total_active_warranties || 0
+            },
             topManager: topManager[0][0]?.created_by || '-',
             topSellingModel: topSellingModel[0][0]?.device_model_name || '-'
         });
@@ -431,12 +408,12 @@ exports.getAdminLifetimeStats = async (req, res) => {
             FROM invoices`
         );
 
-        // Get user counts
-        const userStats = await pool.query(
+        // Get lifetime warranty counts
+        const warrantyStats = await pool.query(
             `SELECT 
-                SUM(CASE WHEN role = 'manager' THEN 1 ELSE 0 END) as total_managers,
-                SUM(CASE WHEN role = 'shop_owner' THEN 1 ELSE 0 END) as total_shop_owners
-            FROM users`
+                SUM(CASE WHEN renewed_on IS NOT NULL THEN 1 ELSE 0 END) as total_extended_warranties,
+                SUM(CASE WHEN status = 'Active' AND end_date > CURDATE() THEN 1 ELSE 0 END) as total_active_warranties
+            FROM warranty_history`
         );
 
         // Get top selling model of all time
@@ -447,17 +424,6 @@ exports.getAdminLifetimeStats = async (req, res) => {
             FROM invoices 
             GROUP BY device_model_name
             ORDER BY sales_count DESC
-            LIMIT 1`
-        );
-
-        // Get top performing shop of all time
-        const topShop = await pool.query(
-            `SELECT 
-                shop_code,
-                SUM(CAST(device_price AS DECIMAL(10,2))) as total_sales
-            FROM invoices 
-            GROUP BY shop_code
-            ORDER BY total_sales DESC
             LIMIT 1`
         );
 
@@ -481,7 +447,7 @@ exports.getAdminLifetimeStats = async (req, res) => {
         );
 
         const lifetime = lifetimeStats[0][0];
-        const users = userStats[0][0];
+        const warranties = warrantyStats[0][0];
         const average = monthlyAverage[0][0];
 
         res.json({
@@ -492,9 +458,10 @@ exports.getAdminLifetimeStats = async (req, res) => {
                 avgMonthlySales: Math.round(average.avg_monthly_sales || 0),
                 avgMonthlyInvoices: Math.round(average.avg_monthly_invoices || 0)
             },
-            totalManagers: users.total_managers || 0,
-            totalShopOwners: users.total_shop_owners || 0,
-            topShop: topShop[0][0]?.shop_code || '-',
+            warranties: {
+                totalExtendedWarranties: warranties.total_extended_warranties || 0,
+                totalActiveWarranties: warranties.total_active_warranties || 0
+            },
             topManager: topManager[0][0]?.created_by || '-',
             topSellingModel: topSellingModel[0][0]?.device_model_name || '-'
         });

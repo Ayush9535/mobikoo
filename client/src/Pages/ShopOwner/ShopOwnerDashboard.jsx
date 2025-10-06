@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { BarChart3, Store, FileText, TrendingUp, RefreshCw, Receipt, Smartphone, Bell, AlertTriangle, User } from 'lucide-react';
+import ShopWarrantyManagement from './ShopWarrantyManagement';
 import InvoiceDetailsModal from '../../components/InvoiceDetailsModal';
+import AnalyticsGraphs from '../../components/AnalyticsGraphs';
 
 const NotificationsPage = ({ notifications, onInvoiceClick }) => (
   <div className="space-y-6">
@@ -335,6 +337,18 @@ export default function ShopOwnerDashboard() {
               </button>
 
               <button
+                onClick={() => setSidebarTab('warranties')}
+                className={`w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
+                  sidebarTab === 'warranties'
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                }`}
+              >
+                <Receipt className="w-4 h-4 mr-3" />
+                Warranty Management
+              </button>
+
+              <button
                 onClick={() => setSidebarTab('notifications')}
                 className={`w-full flex justify-between items-center px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium ${
                   sidebarTab === 'notifications'
@@ -551,6 +565,8 @@ export default function ShopOwnerDashboard() {
                 </div>
               )}
 
+              <AnalyticsGraphs userRole={'shopowner'} duration={selectedDuration}/>
+
               {/* Recent Invoices Section */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-200">
@@ -581,6 +597,8 @@ export default function ShopOwnerDashboard() {
                 </div>
               </div>
             </div>
+          ) : sidebarTab === 'warranties' ? (
+            <ShopWarrantyManagement />
           ) : sidebarTab === 'notifications' ? (
             <NotificationsPage 
               notifications={notifications}
