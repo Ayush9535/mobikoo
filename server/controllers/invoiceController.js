@@ -81,12 +81,13 @@ exports.bulkUploadInvoices = async (req, res) => {
 
   // Check for duplicate IMEI numbers
   const imeiNumbers = invoices.filter(inv => inv.imei_number).map(inv => inv.imei_number);
+  let existingImeiMap = new Map();
   if (imeiNumbers.length > 0) {
     const [existingImeis] = await pool.query(
       'SELECT imei_number, invoice_id, shop_code FROM invoices WHERE imei_number IN (?)',
       [imeiNumbers]
     );
-    const existingImeiMap = new Map(existingImeis.map(inv => [inv.imei_number, { invoice_id: inv.invoice_id, shop_code: inv.shop_code }]));
+    existingImeiMap = new Map(existingImeis.map(inv => [inv.imei_number, { invoice_id: inv.invoice_id, shop_code: inv.shop_code }]));
   }
 
   const fields = [
