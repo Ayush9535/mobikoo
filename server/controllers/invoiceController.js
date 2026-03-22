@@ -138,7 +138,7 @@ exports.bulkUploadInvoices = async (req, res) => {
     }
 
     try {
-      await createInvoice(data);
+      const id = await createInvoice(data);
       await createWarrantyHistory(id, data.date, data.warranty_duration);
       success++;
     } catch (error) {

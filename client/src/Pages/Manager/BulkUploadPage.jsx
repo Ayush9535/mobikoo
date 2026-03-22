@@ -48,17 +48,46 @@ export default function BulkUploadPage() {
   };
 
   const handleReadExcel = async () => {
-    if (!file) return setError('Please select an Excel file.');
+    // 1. File is selected check
+    if (!file) return setError('Select a Excel file');
+
+    // 2. Correct format check
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!['.xlsx', '.xls'].includes(fileExt)) {
+      return setError('Wrong format, Select file of this format .xlsx, .xls');
+    }
+
+    setReading(true);
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+      // 3. Check for missing columns
+      const headersRaw = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] || [];
+      const normalizedHeaders = headersRaw.map(h => normalizeKey(String(h)));
+      const requiredColumns = Object.keys(fieldMap);
+      const missingColumns = requiredColumns.filter(col => !normalizedHeaders.includes(col));
+
+      if (missingColumns.length > 0) {
+        setReading(false);
+        return setError(`${missingColumns.join(', ')} these columns are missing from the file add those first to upload`);
+      }
+
       let parsedRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+      let hasDateError = false;
+
       parsedRows = parsedRows.map(row => {
         const newRow = {};
         for (const key in row) {
           let normKey = normalizeKey(key);
           let value = row[key];
+
+          // 4. Remove leading and trailing spaces
+          if (typeof value === 'string') {
+            value = value.trim();
+          }
+
           // Date conversion
           if (normKey === 'date' && value) {
             if (typeof value === 'number') {
@@ -68,14 +97,20 @@ export default function BulkUploadPage() {
               let d = value.replace(/\//g, '-');
               const parts = d.split('-');
               if (parts.length === 3) {
-                if (parts[2].length === 4) {
+                if (parts[2].length === 4) { // DD-MM-YYYY -> YYYY-MM-DD
                   value = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-                } else if (parts[0].length === 4) {
+                } else if (parts[0].length === 4) { // YYYY-MM-DD
                   value = `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
                 }
               }
             }
+            
+            // 5. Date validation check (must be YYYY-MM-DD or converted to it)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+              hasDateError = true;
+            }
           }
+
           // IMEI as string
           if (normKey === 'imei_number' && value != null) {
             if (typeof value === 'number') {
@@ -84,12 +119,19 @@ export default function BulkUploadPage() {
               let num = Number(value);
               if (!isNaN(num)) value = num.toLocaleString('fullwide', {useGrouping:false});
             }
-            value = String(value);
+            value = String(value).trim();
           }
+          
           newRow[normKey] = value;
         }
         return newRow;
       });
+
+      if (hasDateError) {
+        setRows([]);
+        return setError('Invalid date format. Please try to convert to this format if not possible to convert then tell user to enter correct format date (YYYY-MM-DD)');
+      }
+
       setRows(parsedRows);
       setError('');
     } catch (err) {
@@ -118,7 +160,7 @@ export default function BulkUploadPage() {
       const { success: succCount, failed: failCount, failed_ids, duplicate_ids, duplicate_imeis, validation_errors, message } = resp.data || {};
 
       // Process validation errors first
-      if (validation_errors) {
+      if (validation_errors && validation_errors.length > 0) {
         const errorsMap = {};
         const failedValidationIds = [];
         validation_errors.forEach(item => {

@@ -170,9 +170,14 @@ const ManagerDashboard = () => {
         created_at: '',
       });
     } catch (err) {
+      console.log('Error creating invoice:', err);
       if (err.response?.data?.isDuplicate) {
         setError(err.response?.data?.message || 'This invoice ID already exists for this shop. Please use a different invoice ID.');
-      } else {
+      }else if (err.response?.data?.isDuplicateImei) {
+        setError(err.response?.data?.message || 'This IMEI number already exists. Please check the IMEI and try again.');
+      } else if (err.response?.data?.error === 'Invalid shop') {
+        setError('The selected shop is invalid. Please select a valid shop from the dropdown.');
+      }else {
         setError('Failed to create invoice. Please try again.');
       }
     } finally {
